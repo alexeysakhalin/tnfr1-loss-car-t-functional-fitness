@@ -160,7 +160,11 @@ plot_object <- ggplot(
     plot.margin = margin(30, 20, 20, 20)
   )
 
-ggsave(
+save_ggplot_pair(
+  plot_object,
   file.path(figure_dir, "Figure_5C_bulk_Tcell_expression_score_rank_based.png"),
-  plot_object, width = 11, height = 6.5, dpi = 600, bg = "white"
+  width = 11, height = 6.5
+)
+writeLines(
+  capture.output(sessionInfo()), file.path(figure_dir, "sessionInfo_R06.txt")
 )

@@ -6,6 +6,7 @@ data/analysis/*
 data/rnaseq/
 data/singlecell/
 data/depmap/
+data/project_sources/
 
 # The following CheckMate tables contain aggregate statistics only.
 !data/analysis/checkmate_c6_global_gene_models.tsv.gz
@@ -14,8 +15,11 @@ data/depmap/
 
 # Local preparation records and temporary downloads.
 data/**/*.part
+data/**/*.tmp
+data/.*.prepare.lock
 data/**/*preparation_qc.json
 !data/analysis/checkmate_c6_aggregate_qc.json
+!data/experimental/experimental_preparation_qc.json
 
 # Generated figures, tables and validation exports are local build products.
 figures/

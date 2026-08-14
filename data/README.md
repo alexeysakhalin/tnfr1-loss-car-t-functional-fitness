@@ -16,6 +16,7 @@ exports in one directory.
 | Path | Contents | Version-controlled |
 |---|---|---|
 | `data/source_manifest.tsv` | Source URLs, citations, accessions, licences, expected filenames and SHA-256 values | yes |
+| `data/experimental/` | Non-identifying project-derived transcriptomic analysis tables, checksums and QC | yes |
 | `resources/analysis_gene_identifiers.tsv` | Frozen identifiers for the 181 analysis genes, derived from the declared HGNC snapshot | yes |
 | `resources/hgnc_20260814_gene_identifiers.tsv.gz` | Frozen full HGNC mapping used before transcriptome-wide ranking | yes |
 | `data/raw/` | Publisher files and package exports | no |
@@ -25,6 +26,10 @@ exports in one directory.
 | `data/processed/checkmate_sample_metadata.tsv.gz` | Local CheckMate metadata for all 311 RNA samples | no |
 | `data/analysis/checkmate_c6_global_gene_models.tsv.gz` | Aggregate gene-level coefficients from the nivolumab CheckMate analysis | yes |
 | `data/analysis/checkmate_c6_group_balance.tsv` | Aggregate residualized-group balance statistics | yes |
+
+The experimental tables have a separate provenance and schema guide in
+`data/experimental/README.md`. They are not patient-cohort data and are
+version-controlled under the repository data licence.
 
 ## Reproduction
 

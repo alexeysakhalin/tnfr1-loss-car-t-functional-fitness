@@ -54,7 +54,7 @@ p <- survminer::ggsurvplot(
   title = "Overall survival by bulk T-cell expression score",
   subtitle = subtitle, xlab = "Time (months)", ylab = "Overall survival probability"
 )
-save_ggsurvplot_png(
+save_ggsurvplot_pair(
   p,
   file.path(out_dir, "Figure_5D_KM_ccRCC_Tcell_score.png")
 )
@@ -66,3 +66,6 @@ qc <- tibble(
             "1=event;0=censored", "strata(trial_id)", paste(present, collapse = ";"))
 )
 write.csv(qc, file.path(out_dir, "Figure_5D_QC.csv"), row.names = FALSE)
+writeLines(
+  capture.output(sessionInfo()), file.path(out_dir, "sessionInfo_R07.txt")
+)

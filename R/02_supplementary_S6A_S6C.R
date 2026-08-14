@@ -106,9 +106,8 @@ plot_receptor_distribution <- function(gene, filename) {
     theme_pub() +
     theme(legend.position = "none")
 
-  ggsave(
-    file.path(figure_dir, filename), plot_object,
-    width = 14, height = 4.7, dpi = 600, bg = "white"
+  save_ggplot_pair(
+    plot_object, file.path(figure_dir, filename), width = 14, height = 4.7
   )
 }
 
@@ -203,9 +202,10 @@ peak_plot <- ggplot(
   ) +
   theme_pub()
 
-ggsave(
+save_ggplot_pair(
+  peak_plot,
   file.path(figure_dir, "Supplementary_Figure_S6C_TNFRSF1A_bimodal.png"),
-  peak_plot, width = 7.2, height = 5, dpi = 600, bg = "white"
+  width = 7.2, height = 5
 )
 
 purity_data <- melanoma |>
@@ -233,7 +233,7 @@ purity_plot <- ggplot(
   ) +
   annotate(
     "text", x = 1.5, y = 0.96,
-    label = paste0("Wilcoxon p = ", signif(purity_test$p.value, 2)),
+    label = paste0("Nominal post hoc Wilcoxon p = ", signif(purity_test$p.value, 2)),
     size = 4.6, fontface = "bold"
   ) +
   scale_fill_manual(values = peak_colors) +
@@ -245,9 +245,10 @@ purity_plot <- ggplot(
   theme_pub() +
   theme(legend.position = "none")
 
-ggsave(
+save_ggplot_pair(
+  purity_plot,
   file.path(figure_dir, "Supplementary_Figure_S6C_tumor_purity.png"),
-  purity_plot, width = 6, height = 5.2, dpi = 600, bg = "white"
+  width = 6, height = 5.2
 )
 
 peak_summary <- melanoma |>
@@ -267,4 +268,7 @@ peak_summary <- melanoma |>
 write_csv(
   peak_summary,
   file.path(figure_dir, "Supplementary_Figure_S6C_peak_QC_summary.csv")
+)
+writeLines(
+  capture.output(sessionInfo()), file.path(figure_dir, "sessionInfo_R02.txt")
 )

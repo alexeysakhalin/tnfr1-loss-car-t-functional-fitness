@@ -102,7 +102,7 @@ save_km <- function(endpoint, cluster, filename) {
     title = paste(endpoint, "by", cluster, "transferred T-cell-state expression signature"),
     subtitle = subtitle, xlab = "Time (months)", ylab = "Survival probability"
   )
-  save_ggsurvplot_png(p, file.path(out_dir, filename))
+  save_ggsurvplot_pair(p, file.path(out_dir, filename))
 }
 
 save_km("OS", "C6", "Figure_5E_KM_ccRCC_C6.png")
@@ -110,3 +110,6 @@ save_km("OS", "C1", "Supplementary_Figure_S6D_C1.png")
 save_km("OS", "C0", "Supplementary_Figure_S6D_C0.png")
 save_km("PFS", "C6", "Supplementary_Figure_S6E_PFS_C6.png")
 save_km("PFS", "C0", "Supplementary_Figure_S6E_PFS_C0.png")
+writeLines(
+  capture.output(sessionInfo()), file.path(out_dir, "sessionInfo_R08.txt")
+)

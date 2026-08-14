@@ -5,12 +5,14 @@ This repository contains the analysis code accompanying the manuscript
 CAR-T cell functional fitness in an antigen-retaining in vitro co-culture
 model.”
 
-The code is organized around two distinct evidence layers:
+The code follows the three evidence levels used in the revised manuscript:
 
-1. experimental bulk and targeted single-cell analyses from the in-vitro
-   HeLa–CAR-T system; and
-2. exploratory clinical-context analyses of four published immune-checkpoint
-   blockade cohorts.
+1. the tumor-cell phenotype, including cytokine-induced apoptotic signalling
+   and ICAM1 induction after TNFR1 loss;
+2. the later in-vitro CAR-T phenotype after serial exposure to
+   TNFR1-deficient targets; and
+3. exploratory clinical-context analyses of four published
+   immune-checkpoint-blockade cohorts.
 
 The public cohorts are not CAR-T-treated cohorts and are not used to validate a
 TNFR1-dependent clinical mechanism. Transferred C0–C9 scores are bulk
@@ -27,6 +29,7 @@ patients.
 | `resources/` | Frozen C0–C9 marker definitions, curated display genes and identifier mappings |
 | `reference_results/` | Aggregate validation results without sample identifiers |
 | `data/source_manifest.tsv` | Source URL, DOI/accession, licence, expected filename, size and SHA-256 |
+| `data/experimental/` | Non-identifying experimental analysis tables and QC manifest |
 | `tests/` | Repository-contract and numerical-regression tests |
 
 Sample-level clinical and expression data are not version-controlled. Source
@@ -35,7 +38,11 @@ This avoids redistributing the Braun CheckMate supplement, which does not carry
 an open redistribution licence, and keeps one consistent policy across all
 four cohorts.
 
-## Clinical-context workflow
+Source Excel workbooks should be kept unchanged in the article data archive. R
+scripts consume compact canonical TSV.gz files rather than opaque binary
+workbooks. Patient-level public-cohort inputs remain local-only.
+
+## Software environment
 
 Python 3.12 and R 4.4 are used by the automated checks. Create a Python
 environment and install the pinned validation dependencies:
@@ -46,6 +53,53 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install --requirement requirements.txt
 ```
+
+The final article release must additionally include the `renv.lock` and
+`sessionInfo()` produced by the clean R/Seurat run. Package versions are not
+guessed before that run is completed.
+
+## Experimental workflow
+
+The canonical experimental tables are already version-controlled. Their
+source-workbook hashes and transformation QC are documented in
+[`data/experimental/README.md`](data/experimental/README.md). Authors can
+rebuild them from the eight source workbooks with:
+
+```bash
+python scripts/prepare_experimental_analysis_tables.py --input-dir /path/to/workbooks
+```
+
+Generate the experimental transcriptomic panels in manuscript order:
+
+```bash
+Rscript R/03_figure_1_B_C.R
+Rscript R/04_figure_2_B_suppl_S2D.R
+Rscript R/05_figure_4_AB_suppl_S5A.R
+```
+
+The supplied cytokine-versus-untreated DE workbooks contain only rows with
+adjusted *p*<0.05. They support Figure 1C and the reported ICAM1/IRF1 effects,
+but not a conventional full volcano plot. `R/03_figure_1_B_C.R` therefore
+refuses to create Figure 1B until complete unfiltered DESeq2 results are placed
+at the documented path. The matched T6 workbook supports Figure 2B/S2D, but
+the data themselves do not identify whether T6 is manuscript clone KO1 or
+KO2. The code retains the source identifier pending confirmation.
+
+The current bulk experimental inputs are author-generated differential-
+expression result tables. Accordingly, `R/03` and `R/04` reproduce figure
+layers and thresholded gene sets from those results; they do not re-estimate
+the DE models from a raw count matrix. End-to-end DE reproduction requires
+depositing the count matrix, design/contrast code, filtering record and locked
+software environment in the immutable article-data archive.
+
+The targeted single-cell inputs use the `CD3+ cells` sheets: WT, 3,743 cells;
+KO1, 2,475; KO2, 1,831; and the repeated-stimulation dataset, 5,662. These are
+259-gene targeted count matrices, not whole-transcriptome single-cell RNA-seq.
+The clean release run must archive before/after QC counts, nonempty marker
+tables and author-reviewed marker-to-label mappings; equality of numeric
+cluster identifiers alone is not accepted as annotation validation.
+
+## Clinical-context workflow
 
 Review the source inventory and obtain the required publisher files:
 
@@ -105,18 +159,17 @@ BH-adjusted Cox *p*=0.166 across ten signatures. The descriptive log-rank
 association was detected. These results do not support a predictive biomarker
 claim.
 
-## Experimental inputs
-
-Scripts for Figures 1, 2, 4 and the repeated-stimulation component of Figure 5
-require project RNA-seq and targeted single-cell input files that are not part
-of the patient-cohort archive. Their required local paths are listed in
-[`docs/FIGURE_MAP.md`](docs/FIGURE_MAP.md). The scripts fail explicitly when a
-required input or package is missing.
+## Release-locked analyses
 
 Supplementary Figure S1B is intentionally release-locked: it must not be used
 until the exact DepMap Public release, Figshare DOI, download date, checksums
 and one-default-profile-per-human-cell-line filtering are supplied. The
 repository does not retain the earlier unverified DepMap percentages.
+
+Supplementary Figure S3 is not generated by the transcriptomic workflow. It
+requires raw FCS files, the compensation/gating record, a defined live-cell
+denominator, replicate and donor mapping, and the exact statistical contrasts
+before the panel and legend can be treated as final.
 
 ## Validation
 
@@ -131,6 +184,16 @@ GitHub Actions independently parses every R script and runs the Python
 contract tests on each pull request. Aggregate reference results are retained
 to detect changes in cohort composition, event coding, the frozen 20-gene
 membership of each C0-C9 signature or multiplicity adjustment.
+
+The lightweight workflow checks syntax and data contracts. A release is made
+only after a clean R run regenerates the mapped panels, the figures are
+compared with the source tables, and the resulting `sessionInfo()` is archived.
+
+## Licence
+
+Repository code is available under the MIT License. Author-generated processed
+data and figures are available under CC BY 4.0; third-party data retain their
+source terms. See `LICENSE` and `DATA_LICENSE.md`.
 
 ## Source studies
 

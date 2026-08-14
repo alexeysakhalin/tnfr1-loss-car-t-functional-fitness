@@ -1,18 +1,16 @@
 # Reference figures
 
-This directory contains experimental panels that passed file-integrity and
-label review. They are retained as visual references for the corresponding
-script outputs.
+No manuscript panel is retained here until it has been regenerated from the
+current canonical inputs in the locked release environment. Earlier
+experimental PNGs were removed because they lacked a matching Seurat
+`sessionInfo()`, cluster-marker contract and clean-run record; the earlier
+repeated-stimulation panels also used the 5,665-cell all-cell export rather
+than the revised 5,662-cell CD3-positive input.
 
-- Figure 4A and the Figure 5A UMAP use manual marker-based state annotations;
-  they are not independently validated cell types.
-- Figure 4B reports fractions among computationally retained single-cell
-  profiles and is descriptive rather than biological-replicate inference.
-- The repeated-stimulation C0–C5 labels are independent of the tumor
-  co-culture C0–C5 labels.
-- The former Supplementary Figure S4A is stored under its revised S5A number
-  after insertion of the acute ICAM1/conjugate panel as Supplementary Figure
-  S3.
+After the final clean run, this directory may contain checksum-pinned visual
+references only when the corresponding numerical QC, marker and cluster-count
+tables have been archived. Manual cluster labels require author review of the
+marker profiles; matching cluster numbers alone is not sufficient.
 
 Legacy clinical-context and DepMap images are deliberately absent. They used
 pooled CheckMate arms, obsolete multiplicity values or undocumented DepMap

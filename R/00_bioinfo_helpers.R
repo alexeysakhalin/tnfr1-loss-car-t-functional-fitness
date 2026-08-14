@@ -185,10 +185,21 @@ fit_trial_stratified_survival <- function(data, score_col, endpoint, signature) 
   lr <- survival::survdiff(survival::Surv(time, event) ~ group, data = dat)
   split_tidy <- broom::tidy(split_fit, exponentiate = TRUE, conf.int = TRUE)
   continuous_tidy <- broom::tidy(continuous_fit, exponentiate = TRUE, conf.int = TRUE)
-  ph_p <- tryCatch(
-    unname(survival::cox.zph(split_fit)$table["groupHigh", "p"]),
-    error = function(e) NA_real_
-  )
+  # Match the independent Python validation, which uses the rank time
+  # transformation for the Schoenfeld-residual proportional-hazards test.
+  ph_table <- survival::cox.zph(split_fit, transform = "rank")$table
+  ph_rows <- setdiff(rownames(ph_table), "GLOBAL")
+  group_ph_row <- grep("^group(High)?$", ph_rows, value = TRUE)
+  if (length(group_ph_row) != 1L) {
+    stop(
+      "Could not identify the group term in the proportional-hazards test: ",
+      paste(ph_rows, collapse = ", ")
+    )
+  }
+  ph_p <- unname(ph_table[group_ph_row, "p"])
+  if (length(ph_p) != 1L || !is.finite(ph_p)) {
+    stop("The proportional-hazards test returned a non-finite group p-value.")
+  }
 
   result <- dplyr::tibble(
     endpoint = endpoint,
@@ -216,16 +227,26 @@ fit_trial_stratified_survival <- function(data, score_col, endpoint, signature) 
        km_fit = survival::survfit(survival::Surv(time, event) ~ group, data = dat))
 }
 
-save_ggsurvplot_png <- function(plot_object, path, width = 7, height = 7.2,
-                                dpi = 600) {
+save_ggsurvplot_pair <- function(plot_object, path, width = 7, height = 7.2,
+                                 dpi = 600) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-  grDevices::png(
-    filename = path, width = width, height = height,
-    units = "in", res = dpi, bg = "white"
+  paths <- c(
+    png = path,
+    tiff = paste0(tools::file_path_sans_ext(path), ".tiff")
   )
-  tryCatch(
-    print(plot_object),
-    finally = grDevices::dev.off()
-  )
-  invisible(path)
+  for (format_name in names(paths)) {
+    if (format_name == "png") {
+      grDevices::png(
+        filename = paths[[format_name]], width = width, height = height,
+        units = "in", res = dpi, bg = "white"
+      )
+    } else {
+      grDevices::tiff(
+        filename = paths[[format_name]], width = width, height = height,
+        units = "in", res = dpi, compression = "lzw", bg = "white"
+      )
+    }
+    tryCatch(print(plot_object), finally = grDevices::dev.off())
+  }
+  invisible(paths)
 }

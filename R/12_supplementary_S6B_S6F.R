@@ -119,13 +119,25 @@ make_cohort_scores <- function(cohort) {
 score_df <- map_dfr(cohort_order, make_cohort_scores) |>
   mutate(cohort_label = factor(.data$cohort_label,
                                levels = unname(cohort_labels[cohort_order])))
-checkmate_score_n <- score_df |>
-  filter(.data$cohort_id == "CHECKMATE_CCRCC") |>
-  summarise(n = n_distinct(.data$sample_id)) |>
-  pull(.data$n)
-if (!identical(checkmate_score_n, 181L)) {
-  stop("S6B/S6F scores must be complete for all 181 nivolumab tumors.")
+score_denominators <- score_df |>
+  group_by(.data$cohort_id) |>
+  summarise(n_complete_scores = n_distinct(.data$sample_id), .groups = "drop")
+expected_denominators <- c(
+  IMvigor210_BLCA = 348L,
+  CHECKMATE_CCRCC = 181L,
+  SU2C_MARK_NSCLC = 152L,
+  LIU2019_MELANOMA = 121L
+)
+observed_denominators <- setNames(
+  score_denominators$n_complete_scores, score_denominators$cohort_id
+)
+if (!identical(observed_denominators[names(expected_denominators)], expected_denominators)) {
+  stop("S6B/S6F score denominators differ from the prespecified complete populations.")
 }
+write_csv(
+  score_denominators,
+  file.path(out_dir, "Supplementary_Figure_S6_score_denominators.csv")
+)
 
 pairs <- tribble(
   ~comparison, ~x, ~y, ~x_label, ~y_label,
@@ -187,9 +199,10 @@ p_bars <- ggplot(cor_results, aes(.data$cohort_label, .data$rho,
   theme_pub() +
   theme(legend.position = "none", axis.text.x = element_text(angle = 30, hjust = 1))
 
-ggsave(
+save_ggplot_pair(
+  p_bars,
   file.path(out_dir, "Supplementary_Figure_S6B_bulk_score_correlations.png"),
-  p_bars, width = 13, height = 5.2, dpi = 600, bg = "white"
+  width = 13, height = 5.2
 )
 
 ccrcc_long <- pairs |>
@@ -238,9 +251,10 @@ p_scatter <- ggplot(ccrcc_long, aes(.data$x_value, .data$y_value)) +
   ) +
   theme_pub()
 
-ggsave(
+save_ggplot_pair(
+  p_scatter,
   file.path(out_dir, "Supplementary_Figure_S6F_CheckMate_correlations.png"),
-  p_scatter, width = 13, height = 5.2, dpi = 600, bg = "white"
+  width = 13, height = 5.2
 )
 
 writeLines(capture.output(sessionInfo()), file.path(out_dir, "sessionInfo.txt"))

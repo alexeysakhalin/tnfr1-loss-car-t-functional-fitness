@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
 
 source(file.path("R", "00_bioinfo_helpers.R"))
 source(file.path("R", "00_load_analysis_tables.R"))
+source(file.path("R", "plot_style.R"))
 
 marker_file <- file.path("resources", "CAR_T_state_signatures.csv")
 out_dir <- "figures"
@@ -136,5 +137,11 @@ p <- ggplot(plot_df, aes(.data$cluster, .data$beta, fill = .data$cluster)) +
   theme(legend.position = "none", plot.title = element_text(face = "bold", hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5), plot.margin = margin(10, 20, 10, 10))
 
-ggsave(file.path(out_dir, "Figure_5G_B2M_ICAM1_signature_associations.png"),
-       p, width = 8.5, height = 5.5, dpi = 600, bg = "white")
+save_ggplot_pair(
+  p,
+  file.path(out_dir, "Figure_5G_B2M_ICAM1_signature_associations.png"),
+  width = 8.5, height = 5.5
+)
+writeLines(
+  capture.output(sessionInfo()), file.path(out_dir, "sessionInfo_R10.txt")
+)

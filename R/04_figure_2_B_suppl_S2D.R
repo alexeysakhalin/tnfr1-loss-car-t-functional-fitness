@@ -1,692 +1,287 @@
+# Figure 2B and Supplementary Figure S2D: matched T6-versus-WT RNA-seq.
+#
+# T6 is the internal identifier present in the supplied design workbook. The
+# script does not relabel T6 as KO1 or KO2 because that mapping is not encoded
+# in the data and must be confirmed from the experimental sample key.
 
-# ============================================================
-# FIGURE 2B + SUPPLEMENTARY FIGURE S2D: KO vs WT RNA-seq analysis
-#
-# This script reproduces:
-# - Figure 2B: Volcano plots for KO treated vs WT treated under:
-#     • TNF
-#     • IFNγ
-#     • TNF + IFNγ
-# - Supplementary Figure S2D: Venn diagram of downregulated genes
-#   across the same three treatment conditions
-#
-# ------------------------------------------------------------
-# DATA REQUIREMENTS (IMPORTANT)
-#
-# To run this script, obtain the provenance-documented RNA-seq inputs from the
-# final public data release after its DOI is activated, or generate them from
-# the authors' raw data using the declared pipeline and checksums.
-#
-# The RNA-seq dataset used here is located in:
-#
-#   data/rnaseq/
-#
-# Required file:
-#   PyDESeq2_T6_vs_Hela_matched_treatments (1).xlsx
-#
-# Do NOT change file paths — the script assumes this structure.
-#
-# ------------------------------------------------------------
-# OUTPUT
-#
-# The script generates:
-# - Volcano plots for KO vs WT treated comparisons
-# - Supplementary Venn diagram showing overlap of downregulated genes
-#
-# Output files are saved to:
-#
-#   figures/
-#
-# ------------------------------------------------------------
-# NOTE
-#
-# Significant genes are defined as:
-#   log2FC > 1 and adjusted p-value < 0.05   for upregulated genes
-#   log2FC < -1 and adjusted p-value < 0.05  for downregulated genes
-#
-# Selected genes are highlighted on volcano plots.
-# ============================================================
-
-library(ggplot2)
-library(dplyr)
-library(readxl)
-library(ggrepel)
-library(grid)
-
-dir.create("figures", recursive = TRUE, showWarnings = FALSE)
-
-file_path <- file.path("data", "rnaseq", "PyDESeq2_T6_vs_Hela_matched_treatments (1).xlsx")
-
-if (!file.exists(file_path)) {
-  stop("Input file not found in data/rnaseq/")
+required_packages <- c(
+  "data.table", "R.utils", "dplyr", "ggplot2", "ggrepel", "VennDiagram"
+)
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+if (length(missing_packages) > 0L) {
+  stop("Missing required packages: ", paste(missing_packages, collapse = ", "))
 }
 
-make_volcano_G <- function(sheet_name, panel_title, out_name,
-                           x_limits = c(-15, 15), y_max = 320) {
+suppressPackageStartupMessages({
+  library(data.table)
+  library(dplyr)
+  library(ggplot2)
+  library(ggrepel)
+})
 
-  genes <- read_excel(file_path, sheet = sheet_name) %>%
-    filter(baseMean >= 30) %>%
-    filter(!is.na(log2FoldChange), !is.na(padj)) %>%
-    mutate(
-      Gene_Symbol = toupper(trimws(Gene_Symbol)),
-      padj_plot = ifelse(padj <= 0, 1e-300, padj)
-    ) %>%
-    mutate(
-      status = case_when(
-        log2FoldChange >  1 & padj < 0.05 ~ "Upregulated",
-        log2FoldChange < -1 & padj < 0.05 ~ "Downregulated",
-        TRUE                              ~ "Not significant"
-      )
-    ) %>%
-    filter(is.finite(log2FoldChange), is.finite(-log10(padj_plot)))
+figure_dir <- file.path("figures", "figure_2")
+table_dir <- file.path("results", "figure_2")
+dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 
-  # same genes as Volcano A
-  apoptosis_genes   <- c("CASP3","CASP7","CASP8","CASP9","BAX","BAK1","BCL2","FAS","APAF1")
-  pyroptosis_genes  <- c("GSDMD","GSDME","CASP1","CASP4","CASP5","AIM2","NLRP3")
-  necroptosis_genes <- c("RIPK1","RIPK3","MLKL")
-
-  label_genes <- c(apoptosis_genes, pyroptosis_genes, necroptosis_genes, "ICAM1", "IRF1")
-
-  label_data <- genes %>%
-    filter(Gene_Symbol %in% label_genes) %>%
-    mutate(
-      y = -log10(padj_plot),
-      side = ifelse(log2FoldChange < 0, "left", "right")
-    ) %>%
-    group_by(side) %>%
-    arrange(y, .by_group = TRUE) %>%
-    mutate(
-      offset_rank = row_number(),
-      nudge_x = ifelse(side == "left", -8.5, 8.5),
-      nudge_y = (offset_rank - 1) * 8 + 6
-    ) %>%
-    ungroup()
-
-  # panel-specific tuning
-  if (sheet_name == "TNF") {
-    pull_down <- c("CASP4","CASP7","CASP1","MLKL")
-
-    label_data <- label_data %>%
-      mutate(
-        nudge_y = ifelse(Gene_Symbol == "ICAM1", pmax(0, nudge_y - 95), nudge_y),
-        nudge_x = ifelse(Gene_Symbol == "ICAM1", nudge_x + 0.2, nudge_x),
-
-        nudge_y = ifelse(Gene_Symbol == "CASP8", nudge_y + 8, nudge_y),
-        nudge_x = ifelse(Gene_Symbol == "CASP8", nudge_x + 0.2, nudge_x),
-
-        nudge_y = ifelse(Gene_Symbol == "IRF1", nudge_y + 18, nudge_y),
-        nudge_x = ifelse(Gene_Symbol == "IRF1", nudge_x + 1.5, nudge_x),
-
-        nudge_y = ifelse(Gene_Symbol %in% pull_down, pmax(0, nudge_y - 20), nudge_y)
-      )
-  }
-
-  if (sheet_name == "IFN") {
-    pull_down <- c("CASP4","CASP7","CASP1","MLKL")
-
-    label_data <- label_data %>%
-      mutate(
-        nudge_y = ifelse(Gene_Symbol == "ICAM1", pmax(0, nudge_y - 55), nudge_y),
-        nudge_x = ifelse(Gene_Symbol == "ICAM1", nudge_x + 1.5, nudge_x),
-
-        nudge_y = ifelse(Gene_Symbol %in% pull_down, pmax(0, nudge_y - 40), nudge_y),
-
-        nudge_y = ifelse(Gene_Symbol == "IRF1", pmax(0, nudge_y - 115), nudge_y),
-        nudge_x = ifelse(Gene_Symbol == "IRF1", nudge_x + 1.2, nudge_x),
-
-        nudge_x = ifelse(Gene_Symbol == "CASP4", nudge_x - 0.8, nudge_x),
-        nudge_y = ifelse(Gene_Symbol == "CASP4", pmax(0, nudge_y - 10), nudge_y)
-      )
-  }
-
-  if (sheet_name == "TI") {
-    pull_down <- c("CASP4","CASP7","CASP1","MLKL")
-
-    label_data <- label_data %>%
-      mutate(
-        nudge_y = ifelse(Gene_Symbol %in% pull_down, pmax(0, nudge_y - 40), nudge_y),
-        nudge_y = ifelse(Gene_Symbol == "AIM2", nudge_y + 20, nudge_y),
-
-        nudge_y = ifelse(Gene_Symbol == "ICAM1", pmax(0, nudge_y - 75), nudge_y),
-        nudge_x = ifelse(Gene_Symbol == "ICAM1", nudge_x + 1.5, nudge_x),
-
-        nudge_y = ifelse(Gene_Symbol == "IRF1", pmax(0, nudge_y - 125), nudge_y),
-        nudge_x = ifelse(Gene_Symbol == "IRF1", nudge_x + 1.5, nudge_x),
-
-        nudge_x = ifelse(Gene_Symbol == "CASP7", nudge_x + 0.8, nudge_x),
-        nudge_y = ifelse(Gene_Symbol == "CASP7", nudge_y - 8, nudge_y)
-      )
-  }
-
-  y_max_use <- max(
-    y_max,
-    max(label_data$y + label_data$nudge_y, na.rm = TRUE) + 5
+input_paths <- c(
+  UNTREATED = file.path(
+    "data", "experimental", "hela_t6_vs_wt_untreated_differential_expression.tsv.gz"
+  ),
+  IFN = file.path(
+    "data", "experimental", "hela_t6_vs_wt_ifn_differential_expression.tsv.gz"
+  ),
+  TNF = file.path(
+    "data", "experimental", "hela_t6_vs_wt_tnf_differential_expression.tsv.gz"
+  ),
+  TI = file.path(
+    "data", "experimental", "hela_t6_vs_wt_ti_differential_expression.tsv.gz"
   )
+)
 
-  p <- ggplot(genes, aes(x = log2FoldChange, y = -log10(padj_plot))) +
-    geom_point(aes(color = status), size = 1.8, alpha = 0.85) +
+required_columns <- c(
+  "condition", "gene_symbol", "base_mean", "log2_fold_change_t6_vs_wt",
+  "lfc_se", "wald_statistic_t6_vs_wt", "p_value", "adjusted_p_value"
+)
+
+read_condition <- function(condition_name, path) {
+  if (!file.exists(path)) stop("Missing matched DE table: ", path)
+  table <- data.table::fread(path, data.table = FALSE)
+  missing_columns <- setdiff(required_columns, names(table))
+  if (length(missing_columns) > 0L) {
+    stop(path, " is missing columns: ", paste(missing_columns, collapse = ", "))
+  }
+  table <- table[, required_columns]
+  if (!identical(unique(table$condition), condition_name)) {
+    stop("Condition label mismatch in ", path)
+  }
+  table$gene_symbol <- toupper(trimws(table$gene_symbol))
+  if (any(table$gene_symbol == "") || anyDuplicated(table$gene_symbol)) {
+    stop("Blank or duplicate gene symbols in ", path)
+  }
+  if (!is.numeric(table$base_mean) || any(!is.finite(table$base_mean)) ||
+      any(table$base_mean < 0)) {
+    stop("Invalid base_mean values in ", path)
+  }
+  effect_columns <- c(
+    "log2_fold_change_t6_vs_wt", "lfc_se", "wald_statistic_t6_vs_wt"
+  )
+  effect_missing <- is.na(table[effect_columns])
+  if (any(rowSums(effect_missing) > 0 & rowSums(effect_missing) < 3L)) {
+    stop("Partially missing LFC/SE/Wald triplet in ", path)
+  }
+  effect_available <- !is.na(table$log2_fold_change_t6_vs_wt)
+  if (any(!is.finite(as.matrix(table[effect_available, effect_columns])))) {
+    stop("Non-finite LFC/SE/Wald values in ", path)
+  }
+  if (any(table$lfc_se[effect_available] <= 0)) {
+    stop("Non-positive LFC standard error in ", path)
+  }
+  if (!isTRUE(all.equal(
+      table$log2_fold_change_t6_vs_wt[effect_available] /
+        table$lfc_se[effect_available],
+      table$wald_statistic_t6_vs_wt[effect_available],
+      tolerance = 1e-8,
+      check.attributes = FALSE
+    ))) {
+    stop("LFC/SE/Wald relationship is inconsistent in ", path)
+  }
+
+  # DESeq2 can report a finite effect and p-value with padj=NA after independent
+  # filtering, or leave p and padj missing for rows that were not tested. These
+  # are valid missingness patterns and must not be coerced to significance.
+  p_available <- !is.na(table$p_value)
+  padj_available <- !is.na(table$adjusted_p_value)
+  if (any(p_available & !effect_available) || any(padj_available & !p_available)) {
+    stop("Invalid p-value missingness pattern in ", path)
+  }
+  if (any(!is.finite(table$p_value[p_available])) ||
+      any(table$p_value[p_available] < 0 | table$p_value[p_available] > 1) ||
+      any(!is.finite(table$adjusted_p_value[padj_available])) ||
+      any(table$adjusted_p_value[padj_available] < 0 |
+          table$adjusted_p_value[padj_available] > 1)) {
+    stop("Invalid DE p-value in ", path)
+  }
+  table
+}
+
+tables <- Map(read_condition, names(input_paths), unname(input_paths))
+names(tables) <- names(input_paths)
+gene_sets <- lapply(tables, function(table) sort(table$gene_symbol))
+if (!all(vapply(gene_sets[-1], identical, logical(1), gene_sets[[1]]))) {
+  stop("The four matched contrasts do not have the same gene universe.")
+}
+
+input_qc <- data.frame(
+  condition = names(tables),
+  n_genes = vapply(tables, nrow, integer(1)),
+  n_effect_estimates = vapply(
+    tables,
+    function(table) sum(!is.na(table$log2_fold_change_t6_vs_wt)),
+    integer(1)
+  ),
+  n_p_values = vapply(
+    tables, function(table) sum(!is.na(table$p_value)), integer(1)
+  ),
+  n_adjusted_p_values = vapply(
+    tables, function(table) sum(!is.na(table$adjusted_p_value)), integer(1)
+  )
+)
+data.table::fwrite(input_qc, file.path(table_dir, "matched_DE_input_qc.tsv"), sep = "\t")
+
+label_genes <- c(
+  "CASP3", "CASP7", "CASP8", "CASP9", "BAX", "BAK1", "BCL2", "FAS",
+  "APAF1", "GSDMD", "GSDME", "CASP1", "CASP4", "CASP5", "AIM2",
+  "NLRP3", "RIPK1", "RIPK3", "MLKL", "ICAM1", "IRF1"
+)
+condition_titles <- c(TNF = "TNF", IFN = "IFNγ", TI = "TNF + IFNγ")
+condition_filenames <- c(TNF = "TNF", IFN = "IFNg", TI = "TNF_IFNg")
+
+make_volcano <- function(condition_name) {
+  plot_data <- tables[[condition_name]] |>
+    filter(
+      base_mean >= 30,
+      !is.na(log2_fold_change_t6_vs_wt),
+      !is.na(adjusted_p_value)
+    ) |>
+    mutate(
+      adjusted_p_plot = pmax(adjusted_p_value, .Machine$double.xmin),
+      significance = case_when(
+        log2_fold_change_t6_vs_wt > 1 & adjusted_p_value < 0.05 ~ "Upregulated",
+        log2_fold_change_t6_vs_wt < -1 & adjusted_p_value < 0.05 ~ "Downregulated",
+        TRUE ~ "Not significant"
+      )
+    )
+  labels <- plot_data |>
+    filter(gene_symbol %in% label_genes)
+
+  plot <- ggplot(
+    plot_data,
+    aes(x = log2_fold_change_t6_vs_wt, y = -log10(adjusted_p_plot))
+  ) +
+    geom_point(aes(color = significance), size = 1.1, alpha = 0.75) +
+    geom_vline(xintercept = c(-1, 1), linetype = "dashed", linewidth = 0.35) +
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", linewidth = 0.35) +
+    ggrepel::geom_text_repel(
+      data = labels,
+      aes(label = gene_symbol),
+      seed = 42,
+      size = 3.2,
+      min.segment.length = 0,
+      max.overlaps = Inf
+    ) +
     scale_color_manual(
       values = c(
-        "Upregulated" = "#E64B35",
-        "Downregulated" = "#3182BD",
-        "Not significant" = "grey70"
+        "Upregulated" = "#D1495B",
+        "Downregulated" = "#2B6CB0",
+        "Not significant" = "grey75"
       ),
-      name = "Status"
+      breaks = c("Upregulated", "Downregulated", "Not significant")
     ) +
-    geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +
-    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +
-    coord_cartesian(xlim = x_limits, ylim = c(0, y_max_use), clip = "on") +
-    theme_minimal(base_size = 14) +
     labs(
-      title = panel_title,
-      x = "Log2 Fold Change",
-      y = "-Log10 adjusted p-value"
+      title = condition_titles[[condition_name]],
+      subtitle = "T6 versus WT within treatment condition",
+      x = expression(log[2] * " fold change (T6 vs WT)"),
+      y = expression(-log[10] * " adjusted p-value"),
+      color = NULL
     ) +
+    theme_classic(base_size = 11) +
     theme(
-      plot.title   = element_text(hjust = 0.5, face = "plain", size = 16),
-      axis.title   = element_text(face = "plain", size = 14),
-      axis.text    = element_text(size = 12),
-      legend.title = element_text(face = "plain", size = 14),
-      legend.text  = element_text(size = 12)
-    ) +
-    ggrepel::geom_label_repel(
-      data = label_data,
-      aes(label = Gene_Symbol),
-      color = "black",
-      size = 4,
-      nudge_x = label_data$nudge_x,
-      nudge_y = label_data$nudge_y,
-      direction = "both",
-      box.padding = 0.35,
-      point.padding = 0.25,
-      label.padding = grid::unit(0.15, "lines"),
-      label.size = 0,
-      fill = scales::alpha("white", 0.9),
-      segment.color = "black",
-      segment.size = 0.3,
-      min.segment.length = 0,
-      max.overlaps = Inf,
-      force = 0.5,
-      force_pull = 0.2,
-      seed = 42,
-      xlim = x_limits,
-      ylim = c(0, y_max_use)
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5)
     )
 
-  tiff(
-    file.path("figures", paste0(out_name, ".tiff")),
-    width = 8, height = 6, units = "in", res = 600
+  output_base <- paste0(
+    "Figure_2B_", condition_filenames[[condition_name]], "_T6_vs_WT_volcano"
   )
-  print(p)
-  dev.off()
-
-  png(
-    file.path("figures", paste0(out_name, ".png")),
-    width = 8, height = 6, units = "in", res = 600
+  ggsave(
+    file.path(figure_dir, paste0(output_base, ".png")),
+    plot, width = 7, height = 5.5, units = "in", dpi = 600, bg = "white"
   )
-  print(p)
-  dev.off()
-
-  return(p)
+  ggsave(
+    file.path(figure_dir, paste0(output_base, ".tiff")),
+    plot, width = 7, height = 5.5, units = "in", dpi = 600,
+    compression = "lzw", bg = "white"
+  )
 }
+invisible(lapply(c("TNF", "IFN", "TI"), make_volcano))
 
-# save 3 panels
-p_ti <- make_volcano_G(
-  sheet_name = "TI",
-  panel_title = expression("TNF + IFN" * gamma),
-  out_name = "Figure_2B_TNF_IFNg"
-)
+down_sets <- lapply(c("TNF", "IFN", "TI"), function(condition_name) {
+  table <- tables[[condition_name]]
+  sort(unique(table$gene_symbol[
+    table$base_mean >= 30 &
+      !is.na(table$log2_fold_change_t6_vs_wt) &
+      !is.na(table$adjusted_p_value) &
+      table$log2_fold_change_t6_vs_wt < -1 &
+      table$adjusted_p_value < 0.05
+  ]))
+})
+names(down_sets) <- c("TNF", "IFN", "TI")
 
-p_tnf <- make_volcano_G(
-  sheet_name = "TNF",
-  panel_title = "TNF",
-  out_name = "Figure_2B_TNF"
-)
+n12 <- length(intersect(down_sets$TNF, down_sets$IFN))
+n13 <- length(intersect(down_sets$TNF, down_sets$TI))
+n23 <- length(intersect(down_sets$IFN, down_sets$TI))
+common_down <- sort(Reduce(intersect, down_sets))
+n123 <- length(common_down)
 
-p_ifn <- make_volcano_G(
-  sheet_name = "IFN",
-  panel_title = expression("IFN" * gamma),
-  out_name = "Figure_2B_IFNg"
-)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# =========================
-# Supplementary S2D: Venn for DOWNREGULATED genes
-# =========================
-
-#install.packages(c("readxl", "dplyr", "VennDiagram", "writexl"))
-library(readxl)
-library(dplyr)
-library(VennDiagram)
-library(grid)
-library(writexl)
-
-file_path <- file.path("data", "rnaseq", "PyDESeq2_T6_vs_Hela_matched_treatments (1).xlsx")
-
-# -------------------------
-# 1. Load sheets
-# -------------------------
-deseq_tnf <- read_excel(file_path, sheet = "TNF")
-deseq_ifn <- read_excel(file_path, sheet = "IFN")
-deseq_ti  <- read_excel(file_path, sheet = "TI")
-
-# -------------------------
-# 2. Clean + select DOWN genes
-# -------------------------
-clean_tested_G <- function(df, gene_col = "Gene_Symbol") {
-  df %>%
-    mutate(
-      Gene_Symbol = toupper(trimws(.data[[gene_col]]))
-    ) %>%
-    filter(baseMean >= 30) %>%
-    filter(!is.na(Gene_Symbol), Gene_Symbol != "") %>%
-    filter(!is.na(log2FoldChange), !is.na(padj)) %>%
-    distinct(Gene_Symbol, .keep_all = TRUE)
-}
-
-clean_down_G <- function(df, gene_col = "Gene_Symbol") {
-  clean_tested_G(df, gene_col) %>%
-    filter(log2FoldChange < -1, padj < 0.05)
-}
-
-tnf_down <- clean_down_G(deseq_tnf)
-ifn_down <- clean_down_G(deseq_ifn)
-ti_down  <- clean_down_G(deseq_ti)
-
-# -------------------------
-# 3. Gene vectors
-# -------------------------
-down_tnf <- unique(tnf_down$Gene_Symbol)
-down_ifn <- unique(ifn_down$Gene_Symbol)
-down_ti  <- unique(ti_down$Gene_Symbol)
-
-tested_universe_symbols <- Reduce(intersect, list(
-  clean_tested_G(deseq_tnf)$Gene_Symbol,
-  clean_tested_G(deseq_ifn)$Gene_Symbol,
-  clean_tested_G(deseq_ti)$Gene_Symbol
-))
-
-length(down_tnf)
-length(down_ifn)
-length(down_ti)
-
-length(intersect(down_tnf, down_ifn))
-length(intersect(down_ifn, down_ti))
-length(intersect(down_tnf, down_ti))
-length(Reduce(intersect, list(down_tnf, down_ifn, down_ti)))
-
-# -------------------------
-# 4. Venn counts
-# -------------------------
-n12  <- length(intersect(down_tnf, down_ifn))
-n23  <- length(intersect(down_ifn, down_ti))
-n13  <- length(intersect(down_tnf, down_ti))
-n123 <- length(Reduce(intersect, list(down_tnf, down_ifn, down_ti)))
-
-# -------------------------
-# 5. Draw Venn
-# -------------------------
-venn.plot <- draw.triple.venn(
-  area1 = length(down_tnf),
-  area2 = length(down_ifn),
-  area3 = length(down_ti),
+venn_grob <- VennDiagram::draw.triple.venn(
+  area1 = length(down_sets$TNF),
+  area2 = length(down_sets$IFN),
+  area3 = length(down_sets$TI),
   n12 = n12,
-  n23 = n23,
   n13 = n13,
+  n23 = n23,
   n123 = n123,
   category = c("TNF", "IFNγ", "TNF + IFNγ"),
-
   fill = c("#6FC7CF", "#1CC5FE", "#FBA27D"),
   alpha = 0.75,
-
-  cex = 2,
-  fontface = "bold",
-
-  cat.cex = 2,
-  cat.fontface = "bold",
-
-  lwd = 2,
-  scaled = FALSE
+  cex = 1.5,
+  cat.cex = 1.4,
+  lwd = 1.5,
+  scaled = FALSE,
+  ind = FALSE
 )
 
-# -------------------------
-# 6. Save Venn
-# -------------------------
-
-tiff(
-  file.path("figures", "Supplementary_Figure_S2D_Venn_downregulated.tiff"),
-  width = 6, height = 6, units = "in", res = 600
-)
-grid.draw(venn.plot)
-dev.off()
-
-png(
-  file.path("figures", "Supplementary_Figure_S2D_Venn_downregulated.png"),
-  width = 6, height = 6, units = "in", res = 600
-)
-grid.draw(venn.plot)
-dev.off()
-
-
-
-
-
-
-
-
-
-
-
-
-# =========================
-# Suppl S2D making Excel file for common DOWN genes
-# =========================
-
-common_down <- Reduce(intersect, list(down_tnf, down_ifn, down_ti))
-length(common_down)
-
-common_down_genes_only <- data.frame(Gene_Symbol = sort(common_down))
-
-tnf_tbl <- tnf_down %>%
-  dplyr::select(Gene_Symbol, log2FoldChange, padj, baseMean) %>%
-  dplyr::rename(
-    log2FC_TNF = log2FoldChange,
-    padj_TNF = padj,
-    baseMean_TNF = baseMean
-  )
-
-ifn_tbl <- ifn_down %>%
-  dplyr::select(Gene_Symbol, log2FoldChange, padj, baseMean) %>%
-  dplyr::rename(
-    log2FC_IFNg = log2FoldChange,
-    padj_IFNg = padj,
-    baseMean_IFNg = baseMean
-  )
-
-ti_tbl <- ti_down %>%
-  dplyr::select(Gene_Symbol, log2FoldChange, padj, baseMean) %>%
-  dplyr::rename(
-    log2FC_TNF_IFNg = log2FoldChange,
-    padj_TNF_IFNg = padj,
-    baseMean_TNF_IFNg = baseMean
-  )
-
-common_down_with_stats <- data.frame(Gene_Symbol = common_down) %>%
-  left_join(tnf_tbl, by = "Gene_Symbol") %>%
-  left_join(ifn_tbl, by = "Gene_Symbol") %>%
-  left_join(ti_tbl, by = "Gene_Symbol") %>%
-  arrange(log2FC_TNF_IFNg)
-
-# -------------------------
-# Save Excel (downregulated genes)
-# -------------------------
-save_path <- file.path("figures", "Supplementary_Figure_S2D_common_downregulated_genes.xlsx")
-
-write_xlsx(
-  list(
-    "common_down_genes_only" = common_down_genes_only,
-    "common_down_with_log2FC" = common_down_with_stats
-  ),
-  path = save_path
-)
-
-cat("Excel saved:\n")
-cat(save_path, "\n")
-
-
-
-
-
-
-
-
-
-
-
-
-# =========================
-# Suppl S2D
-# =========================
-# =========================
-# Enrichment: GO BP / CC / MF / KEGG
-# for common downregulated genes (Optional)
-# =========================
-
-library(clusterProfiler)
-library(org.Hs.eg.db)
-library(enrichplot)
-library(openxlsx)
-library(ggplot2)
-library(dplyr)
-
-genes_down <- common_down
-
-# -------------------------
-# 1. SYMBOL -> ENTREZ
-# -------------------------
-gene_df <- bitr(
-  genes_down,
-  fromType = "SYMBOL",
-  toType = c("ENTREZID"),
-  OrgDb = org.Hs.eg.db
-)
-
-entrez_genes <- unique(gene_df$ENTREZID)
-
-universe_df <- bitr(
-  tested_universe_symbols,
-  fromType = "SYMBOL",
-  toType = "ENTREZID",
-  OrgDb = org.Hs.eg.db
-)
-entrez_universe <- unique(universe_df$ENTREZID)
-
-# -------------------------
-# 2. Enrichment
-# -------------------------
-ego_bp <- enrichGO(
-  gene          = entrez_genes,
-  universe      = entrez_universe,
-  OrgDb         = org.Hs.eg.db,
-  keyType       = "ENTREZID",
-  ont           = "BP",
-  pAdjustMethod = "BH",
-  pvalueCutoff  = 0.1,
-  qvalueCutoff  = 1,
-  readable      = TRUE
-)
-
-ego_cc <- enrichGO(
-  gene          = entrez_genes,
-  universe      = entrez_universe,
-  OrgDb         = org.Hs.eg.db,
-  keyType       = "ENTREZID",
-  ont           = "CC",
-  pAdjustMethod = "BH",
-  pvalueCutoff  = 0.1,
-  qvalueCutoff  = 1,
-  readable      = TRUE
-)
-
-ego_mf <- enrichGO(
-  gene          = entrez_genes,
-  universe      = entrez_universe,
-  OrgDb         = org.Hs.eg.db,
-  keyType       = "ENTREZID",
-  ont           = "MF",
-  pAdjustMethod = "BH",
-  pvalueCutoff  = 0.1,
-  qvalueCutoff  = 1,
-  readable      = TRUE
-)
-
-ego_kegg <- enrichKEGG(
-  gene          = entrez_genes,
-  universe      = entrez_universe,
-  organism      = "hsa",
-  pvalueCutoff  = 0.1,
-  pAdjustMethod = "BH",
-  qvalueCutoff  = 1
-)
-
-# -------------------------
-# 3. Convert to data frames
-# -------------------------
-bp_df   <- as.data.frame(ego_bp)
-cc_df   <- as.data.frame(ego_cc)
-mf_df   <- as.data.frame(ego_mf)
-kegg_df <- as.data.frame(ego_kegg)
-
-cat("GO BP rows:", nrow(bp_df), "\n")
-cat("GO CC rows:", nrow(cc_df), "\n")
-cat("GO MF rows:", nrow(mf_df), "\n")
-cat("KEGG rows:", nrow(kegg_df), "\n")
-
-# -------------------------
-# 4. Save all non-empty results to Excel
-# -------------------------
-out_list <- list(
-  mapped_genes = gene_df
-)
-
-if (nrow(bp_df) > 0)   out_list[["GO_BP"]] <- bp_df
-if (nrow(cc_df) > 0)   out_list[["GO_CC"]] <- cc_df
-if (nrow(mf_df) > 0)   out_list[["GO_MF"]] <- mf_df
-if (nrow(kegg_df) > 0) out_list[["KEGG"]]  <- kegg_df
-
-# =========================
-# 4. Save Excel
-# =========================
-excel_path <- file.path("figures", "Supplementary_Figure_S2D_common_down_enrichment_all.xlsx")
-
-write.xlsx(
-  out_list,
-  file = excel_path,
-  overwrite = TRUE
-)
-
-cat("Excel saved:\n")
-cat(excel_path, "\n")
-
-
-# =========================
-# 5. Function to save dotplot + gene ratio plot
-# =========================
-save_enrichment_plots <- function(enrich_obj, enrich_df, prefix, title_text) {
-
-  if (nrow(enrich_df) == 0) {
-    cat(prefix, ": no enriched terms, skipping plots\n")
-    return(NULL)
+save_venn <- function(path, device) {
+  if (identical(device, "png")) {
+    grDevices::png(path, width = 6, height = 6, units = "in", res = 600)
+  } else {
+    grDevices::tiff(
+      path, width = 6, height = 6, units = "in", res = 600,
+      compression = "lzw"
+    )
   }
-
-  n_show <- min(12, nrow(enrich_df))
-
-  # ---- dotplot ----
-  p_dot <- dotplot(
-    enrich_obj,
-    showCategory = n_show,
-    font.size = 12,
-    title = title_text
-  ) +
-    theme(
-      plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
-      axis.text.y = element_text(size = 11),
-      axis.text.x = element_text(size = 11),
-      axis.title = element_text(size = 12)
-    )
-
-  tiff(
-    file.path("figures", paste0(prefix, "_dotplot.tiff")),
-    width = 9, height = 7, units = "in", res = 600
-  )
-  print(p_dot)
-  dev.off()
-
-  png(
-    file.path("figures", paste0(prefix, "_dotplot.png")),
-    width = 9, height = 7, units = "in", res = 600
-  )
-  print(p_dot)
-  dev.off()
-
-  # ---- gene ratio plot ----
-  plot_df <- enrich_df %>%
-    dplyr::slice_head(n = n_show) %>%
-    dplyr::mutate(
-      Description = factor(Description, levels = rev(Description)),
-      GeneRatio_num = sapply(GeneRatio, function(x) {
-        parts <- strsplit(x, "/")[[1]]
-        as.numeric(parts[1]) / as.numeric(parts[2])
-      })
-    )
-
-  p_ratio <- ggplot(plot_df, aes(x = GeneRatio_num, y = Description)) +
-    geom_point(aes(size = Count, color = p.adjust)) +
-    theme_bw(base_size = 12) +
-    labs(
-      title = paste0(title_text, " - Gene Ratio"),
-      x = "Gene Ratio",
-      y = NULL,
-      color = "Adjusted p-value",
-      size = "Gene count"
-    ) +
-    theme(
-      plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
-      axis.text.y = element_text(size = 11),
-      axis.text.x = element_text(size = 11),
-      axis.title = element_text(size = 12)
-    )
-
-  tiff(
-    file.path("figures", paste0(prefix, "_gene_ratio.tiff")),
-    width = 9, height = 7, units = "in", res = 600
-  )
-  print(p_ratio)
-  dev.off()
-
-  png(
-    file.path("figures", paste0(prefix, "_gene_ratio.png")),
-    width = 9, height = 7, units = "in", res = 600
-  )
-  print(p_ratio)
-  dev.off()
+  on.exit(grDevices::dev.off(), add = TRUE)
+  grid::grid.draw(venn_grob)
 }
-
-# =========================
-# 6. Save plots for each category
-# =========================
-save_enrichment_plots(
-  ego_bp, bp_df,
-  prefix = "Supplementary_Figure_S2D_common_down_GO_BP",
-  title_text = "GO Biological Process enrichment"
+save_venn(
+  file.path(figure_dir, "Supplementary_Figure_S2D_downregulated_overlap.png"),
+  "png"
+)
+save_venn(
+  file.path(figure_dir, "Supplementary_Figure_S2D_downregulated_overlap.tiff"),
+  "tiff"
 )
 
-save_enrichment_plots(
-  ego_cc, cc_df,
-  prefix = "Supplementary_Figure_S2D_common_down_GO_CC",
-  title_text = "GO Cellular Component enrichment"
+common_table <- bind_rows(lapply(names(down_sets), function(condition_name) {
+  tables[[condition_name]] |>
+    filter(gene_symbol %in% common_down) |>
+    transmute(
+      condition = condition_name,
+      gene_symbol,
+      base_mean,
+      log2_fold_change_t6_vs_wt,
+      adjusted_p_value
+    )
+})) |>
+  arrange(gene_symbol, factor(condition, levels = c("TNF", "IFN", "TI")))
+data.table::fwrite(
+  common_table,
+  file.path(table_dir, "Supplementary_Figure_S2D_common_downregulated_genes.tsv"),
+  sep = "\t"
 )
+writeLines(capture.output(sessionInfo()), file.path(table_dir, "sessionInfo.txt"))
 
-save_enrichment_plots(
-  ego_mf, mf_df,
-  prefix = "Supplementary_Figure_S2D_common_down_GO_MF",
-  title_text = "GO Molecular Function enrichment"
-)
-
-save_enrichment_plots(
-  ego_kegg, kegg_df,
-  prefix = "Supplementary_Figure_S2D_common_down_KEGG",
-  title_text = "KEGG pathway enrichment"
-)
+message("Figure 2B and Supplementary Figure S2D outputs written to ", figure_dir)

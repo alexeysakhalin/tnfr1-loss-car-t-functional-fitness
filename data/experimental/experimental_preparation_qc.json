@@ -1,0 +1,177 @@
+{
+  "canonical_outputs": [
+    {
+      "path": "data/experimental/hela_cytokine_significant_differential_expression.tsv.gz",
+      "rows": 28186,
+      "sha256": "20efb657c9d6b81dfae8eecd7891f8e0db044c94bc5e082d715ae0cab555a169",
+      "size_bytes": 1789788
+    },
+    {
+      "path": "data/experimental/hela_t6_matched_sample_design.tsv",
+      "rows": 24,
+      "sha256": "48365a975aeca5935760d0927777f663e18b903ae1200c9da251e776565b8f2d",
+      "size_bytes": 919
+    },
+    {
+      "path": "data/experimental/hela_t6_vs_wt_untreated_differential_expression.tsv.gz",
+      "rows": 46425,
+      "sha256": "d1cf86c58f50ee1bf12b8c5176ac07c74edb076cb53103293457f1d8049371ec",
+      "size_bytes": 1433792
+    },
+    {
+      "path": "data/experimental/hela_t6_vs_wt_ifn_differential_expression.tsv.gz",
+      "rows": 46425,
+      "sha256": "2a742572175715acae6b79c1f115f27c8b2840ae11609484f0417fce622dc1f2",
+      "size_bytes": 1518498
+    },
+    {
+      "path": "data/experimental/hela_t6_vs_wt_tnf_differential_expression.tsv.gz",
+      "rows": 46425,
+      "sha256": "4b49c953e1559b456737eadd27566aa85864271f22273982d4b28fd41f6be8cf",
+      "size_bytes": 1460365
+    },
+    {
+      "path": "data/experimental/hela_t6_vs_wt_ti_differential_expression.tsv.gz",
+      "rows": 46425,
+      "sha256": "a90c19231928e1347355a6466d5193ebb4c20a8c51faa023e4603bc37a0c785f",
+      "size_bytes": 1485365
+    },
+    {
+      "path": "data/experimental/singlecell/WT_targeted_counts.tsv.gz",
+      "rows": 3743,
+      "sha256": "43e0dafb0033448e58d1b2bf23e2c89a46d5708436a27b90719288ec2bd55eb0",
+      "size_bytes": 680289
+    },
+    {
+      "path": "data/experimental/singlecell/KO1_targeted_counts.tsv.gz",
+      "rows": 2475,
+      "sha256": "4a30de639fa2649256966cc63c5e6805d236b65cba1f8ed226142b7167c25d3f",
+      "size_bytes": 403675
+    },
+    {
+      "path": "data/experimental/singlecell/KO2_targeted_counts.tsv.gz",
+      "rows": 1831,
+      "sha256": "1d5bd32e18a9ba71faa98e098c45ef86a4601a68a7582aa6607fd632cef7df72",
+      "size_bytes": 263329
+    },
+    {
+      "path": "data/experimental/singlecell/TCR_targeted_counts.tsv.gz",
+      "rows": 5662,
+      "sha256": "4a1012508b5e34d133fd80518b61123070ab0d15cab720257cd0f016d24b849c",
+      "size_bytes": 931380
+    }
+  ],
+  "cytokine_differential_expression": {
+    "IFNG": {
+      "rows": 10672,
+      "rows_with_adjusted_p_at_least_0_05": 0,
+      "source_stat_sign_reversed_rows": 10672,
+      "unique_genes": 10672,
+      "zero_adjusted_p_values": 1,
+      "zero_p_values": 2
+    },
+    "TNF": {
+      "rows": 6632,
+      "rows_with_adjusted_p_at_least_0_05": 0,
+      "source_stat_sign_reversed_rows": 6632,
+      "unique_genes": 6632,
+      "zero_adjusted_p_values": 0,
+      "zero_p_values": 0
+    },
+    "TNF_IFNG": {
+      "rows": 10882,
+      "rows_with_adjusted_p_at_least_0_05": 0,
+      "source_stat_sign_reversed_rows": 10882,
+      "unique_genes": 10882,
+      "zero_adjusted_p_values": 1,
+      "zero_p_values": 2
+    }
+  },
+  "manifest_sha256": "7b6c1bcc832e16dc3bb53171ec889aab42a41f8a042efd453eea3d4a4458843d",
+  "schema_version": 1,
+  "single_cell": {
+    "KO1": {
+      "cells": 2475,
+      "detected_features_max": 174,
+      "detected_features_median": 114,
+      "detected_features_min": 65,
+      "genes": 259,
+      "library_size_max": 42593,
+      "library_size_median": 4434,
+      "library_size_min": 1176,
+      "source_sheet": "CD3+ cells"
+    },
+    "KO2": {
+      "cells": 1831,
+      "detected_features_max": 169,
+      "detected_features_median": 88,
+      "detected_features_min": 43,
+      "genes": 259,
+      "library_size_max": 33565,
+      "library_size_median": 3092,
+      "library_size_min": 1198,
+      "source_sheet": "CD3+ cells"
+    },
+    "TCR": {
+      "cells": 5662,
+      "detected_features_max": 161,
+      "detected_features_median": 103.0,
+      "detected_features_min": 48,
+      "genes": 259,
+      "library_size_max": 44623,
+      "library_size_median": 5625.0,
+      "library_size_min": 1197,
+      "source_sheet": "CD3+ cells"
+    },
+    "WT": {
+      "cells": 3743,
+      "detected_features_max": 189,
+      "detected_features_median": 127,
+      "detected_features_min": 65,
+      "genes": 259,
+      "library_size_max": 71831,
+      "library_size_median": 5737,
+      "library_size_min": 1593,
+      "source_sheet": "CD3+ cells"
+    }
+  },
+  "t6_matched_design": {
+    "all_sheet": {
+      "matches_ordered_condition_union": true,
+      "rows": 185700,
+      "source_row_digest_sha256": "b59ed0d497265f6802051221a9d482d1426744e7d400b03a8d80b2b84a58a85f"
+    },
+    "design": {
+      "Hela|IFN": 3,
+      "Hela|TI": 3,
+      "Hela|TNF": 3,
+      "Hela|UNTREATED": 3,
+      "T6|IFN": 3,
+      "T6|TI": 3,
+      "T6|TNF": 3,
+      "T6|UNTREATED": 3
+    },
+    "sheets": {
+      "IFN": {
+        "adjusted_p_missing": 26797,
+        "rows": 46425,
+        "unique_genes": 46425
+      },
+      "TI": {
+        "adjusted_p_missing": 27941,
+        "rows": 46425,
+        "unique_genes": 46425
+      },
+      "TNF": {
+        "adjusted_p_missing": 28366,
+        "rows": 46425,
+        "unique_genes": 46425
+      },
+      "UNTREATED": {
+        "adjusted_p_missing": 32325,
+        "rows": 46425,
+        "unique_genes": 46425
+      }
+    }
+  }
+}

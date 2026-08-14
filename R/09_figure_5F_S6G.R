@@ -153,9 +153,10 @@ volcano_plot <- ggplot(global_models, aes(.data$beta, .data$neglog10_p)) +
   theme_pub() +
   theme(legend.position = "top")
 
-ggsave(
+save_ggplot_pair(
+  volcano_plot,
   file.path(figure_dir, "Figure_5F_C6_adjusted_gene_level_volcano.png"),
-  volcano_plot, width = 9, height = 6.5, dpi = 600, bg = "white"
+  width = 9, height = 6.5
 )
 
 # S6G uses the two-group aggregate summary from the same 181-sample model.
@@ -223,9 +224,10 @@ balance_plot <- ggplot(
   theme_pub() +
   theme(legend.position = "none")
 
-ggsave(
+save_ggplot_pair(
+  balance_plot,
   file.path(figure_dir, "Supplementary_Figure_S6G_C6_group_balance.png"),
-  balance_plot, width = 5.5, height = 5, dpi = 600, bg = "white"
+  width = 5.5, height = 5
 )
 
 writeLines(capture.output(sessionInfo()), file.path(output_dir, "sessionInfo.txt"))

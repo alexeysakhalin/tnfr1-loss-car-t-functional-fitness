@@ -178,6 +178,9 @@ p_scatter <- ggplot(analysis, aes(.data$RIPK3, .data$NLRP3)) +
 
 ggsave(file.path(out_dir, "Supplementary_Figure_S1B_strip.png"),
        p_strip, width = 8, height = 3.8, dpi = 600, bg = "white")
+ggsave(file.path(out_dir, "Supplementary_Figure_S1B_strip.tiff"),
+       p_strip, width = 8, height = 3.8, dpi = 600,
+       compression = "lzw", bg = "white")
 ggsave(file.path(out_dir, "Supplementary_Figure_S1B_scatter.png"),
        p_scatter, width = 6, height = 5.5, dpi = 600, bg = "white")
 ggsave(file.path(out_dir, "Supplementary_Figure_S1B_scatter.tiff"),

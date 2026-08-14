@@ -11,20 +11,9 @@
 # ------------------------------------------------------------
 # DATA REQUIREMENTS (IMPORTANT)
 #
-# To run this script, obtain the provenance-documented single-cell inputs from
-# the final public data release after its DOI is activated.
-#
-# Input files for the single-cell analysis are located in:
-#
-#   data/singlecell/
-#
-# Required files:
-#   - WT_new.xlsx
-#   - KO1_new.xlsx
-#   - KO2_new.xlsx
-#   - TCR.xlsx
-#
-# Do NOT change file paths — the script assumes this structure.
+# The version-controlled inputs are deterministic TSV.gz exports of the CD3+
+# cell sheets from the four source workbooks. Their source and output SHA-256
+# values are recorded in data/experimental/experimental_data_manifest.tsv.
 #
 # ------------------------------------------------------------
 # OUTPUT
@@ -51,7 +40,7 @@
 # - cluster composition analysis
 # - marker gene identification
 #
-# C10 is retained in the complete object and QC export. It is excluded from the
+# C10 is retained in the complete object and marker/QC exports. It is excluded post-clustering from the
 # C0-C9 state summaries and transferred signatures used in the manuscript.
 # This is an explicit analysis decision, not a sample-level QC exclusion. The
 # repeated-stimulation dataset is clustered and annotated independently; its
@@ -62,8 +51,9 @@
 # - Supplementary Figure S5A (UMAP per sample)
 # - Figure 5A (repeated-stimulation analysis)
 #
-# A separate section of the script performs TCR-specific analysis
-# using the TCR.xlsx dataset.
+# A separate section performs the repeated-stimulation analysis using the
+# TCR CD3+ subset (5,662 cells); the three CD3-negative cells in the source
+# workbook's "all cells" sheet are not included.
 
 # -----------------------------
 # Install/load packages
@@ -76,13 +66,12 @@ install_if_missing <- function(pkgs) {
 }
 
 needed <- c(
-  "readxl", "Matrix", "Seurat", "dplyr", "tidyr", "tibble",
-  "ggplot2", "patchwork", "data.table", "scales", "openxlsx"
+  "Matrix", "Seurat", "dplyr", "tidyr", "tibble",
+  "ggplot2", "patchwork", "data.table", "R.utils", "scales", "openxlsx"
 )
 install_if_missing(needed)
 
 suppressPackageStartupMessages({
-  library(readxl)
   library(Matrix)
   library(Seurat)
   library(dplyr)
@@ -93,6 +82,7 @@ suppressPackageStartupMessages({
   library(data.table)
   library(scales)
   library(openxlsx)
+  library(grid)
 })
 
 # -----------------------------
@@ -100,9 +90,9 @@ suppressPackageStartupMessages({
 # Input files
 # -----------------------------
 FILES <- c(
-  WT  = file.path("data", "singlecell", "WT_new.xlsx"),
-  KO1 = file.path("data", "singlecell", "KO1_new.xlsx"),
-  KO2 = file.path("data", "singlecell", "KO2_new.xlsx")
+  WT  = file.path("data", "experimental", "singlecell", "WT_targeted_counts.tsv.gz"),
+  KO1 = file.path("data", "experimental", "singlecell", "KO1_targeted_counts.tsv.gz"),
+  KO2 = file.path("data", "experimental", "singlecell", "KO2_targeted_counts.tsv.gz")
 )
 
 # -----------------------------
@@ -155,7 +145,7 @@ cluster_labels_full <- c(
   "C7"  = "C7 cycling effector-like",
   "C8"  = "C8 IL9hi TH9-like",
   "C9"  = "C9 TCF7hi stem-like/early-memory",
-  "C10" = "C10 QC-excluded cluster"
+  "C10" = "C10 post-clustering excluded cluster"
 )
 
 # -----------------------------
@@ -178,44 +168,61 @@ cluster_cols <- c(
   "C7 cycling effector-like"                = "#2A96E6",
   "C8 IL9hi TH9-like"                       = "#A27AE8",
   "C9 TCF7hi stem-like/early-memory"        = "#D865D8",
-  "C10 QC-excluded cluster"                 = "#E75AA2"
+  "C10 post-clustering excluded cluster"    = "#E75AA2"
 )
 
 # -----------------------------
 # Utilities
 # -----------------------------
 save_plot <- function(p, fn, w = 7, h = 6, dpi = 600) {
+  png_path <- file.path(FIG_DIR, fn)
   ggsave(
-    filename = file.path(FIG_DIR, fn),
+    filename = png_path,
     plot = p,
     width = w,
     height = h,
-    dpi = dpi
+    dpi = dpi,
+    bg = "white"
+  )
+  tiff_path <- file.path(
+    FIG_DIR,
+    paste0(tools::file_path_sans_ext(basename(fn)), ".tiff")
+  )
+  ggsave(
+    filename = tiff_path,
+    plot = p,
+    width = w,
+    height = h,
+    dpi = dpi,
+    compression = "lzw",
+    bg = "white"
   )
 }
 
-read_bd_xlsx_matrix <- function(path) {
-  sheets <- readxl::excel_sheets(path)
-  if (length(sheets) == 0) stop("No sheets found in: ", path)
+read_targeted_count_matrix <- function(path) {
+  df <- data.table::fread(path, data.table = FALSE, check.names = FALSE)
+  if (ncol(df) < 2L || names(df)[1] != "cell_index") {
+    stop("Unexpected targeted-count table schema: ", path)
+  }
 
-  sh <- sheets[1]
-  df <- readxl::read_excel(path, sheet = sh)
-  df <- as.data.frame(df)
-
-  if (ncol(df) < 2) stop("Input file has too few columns: ", path)
-
-  first_col <- colnames(df)[1]
-  cell_ids <- make.unique(as.character(df[[first_col]]))
+  cell_ids <- trimws(as.character(df[[1]]))
+  if (any(is.na(cell_ids) | cell_ids == "") || anyDuplicated(cell_ids)) {
+    stop("Missing or duplicate cell identifier(s) in: ", path)
+  }
   expr_df <- df[, -1, drop = FALSE]
-
-  expr_df[] <- lapply(expr_df, function(x) suppressWarnings(as.numeric(x)))
-  expr_df[is.na(expr_df)] <- 0
-
+  gene_names <- trimws(colnames(expr_df))
+  if (any(is.na(gene_names) | gene_names == "") || anyDuplicated(gene_names)) {
+    stop("Missing or duplicate gene name(s) in: ", path)
+  }
   expr_mat_cell_gene <- as.matrix(expr_df)
+  storage.mode(expr_mat_cell_gene) <- "numeric"
+  if (any(!is.finite(expr_mat_cell_gene))) {
+    stop("The count matrix contains missing or non-numeric value(s): ", path)
+  }
+  if (any(expr_mat_cell_gene < 0) || any(expr_mat_cell_gene %% 1 != 0)) {
+    stop("The count matrix must contain non-negative integer counts: ", path)
+  }
   rownames(expr_mat_cell_gene) <- cell_ids
-
-  gene_names <- colnames(expr_df)
-  gene_names <- make.unique(gene_names)
 
   counts <- t(expr_mat_cell_gene)
   rownames(counts) <- gene_names
@@ -225,7 +232,7 @@ read_bd_xlsx_matrix <- function(path) {
 
   list(
     counts = counts,
-    sheet_used = sh,
+    source_subset = "CD3+ cells",
     n_genes = nrow(counts),
     n_cells = ncol(counts)
   )
@@ -234,17 +241,18 @@ read_bd_xlsx_matrix <- function(path) {
 # -----------------------------
 # Read files and create objects
 # -----------------------------
+set.seed(12345)
 objs <- list()
 
 for (nm in names(FILES)) {
   fp <- FILES[[nm]]
   if (!file.exists(fp)) stop("Missing input file: ", fp)
 
-  dat <- read_bd_xlsx_matrix(fp)
+  dat <- read_targeted_count_matrix(fp)
   counts <- dat$counts
 
   message("Loaded ", nm,
-          " | sheet=", dat$sheet_used,
+          " | source subset=", dat$source_subset,
           " | genes=", dat$n_genes,
           " | cells=", dat$n_cells)
 
@@ -311,6 +319,23 @@ meta_qc <- meta_before %>%
       (nFeature_RNA <= nFeature_high) &
       (nCount_RNA   <= nCount_high)
   )
+
+qc_summary <- meta_qc %>%
+  dplyr::group_by(sample) %>%
+  dplyr::summarise(
+    input_cells = dplyr::n(),
+    retained_cells = sum(pass_qc),
+    excluded_cells = sum(!pass_qc),
+    nFeature_low = dplyr::first(nFeature_low),
+    nFeature_high = dplyr::first(nFeature_high),
+    nCount_high = dplyr::first(nCount_high),
+    .groups = "drop"
+  )
+data.table::fwrite(
+  qc_summary,
+  file.path(FIG_DIR, "Supplementary_Table_S5_cell_filtering_QC.tsv"),
+  sep = "\t"
+)
 
 cells_keep <- meta_qc$cell[meta_qc$pass_qc]
 obj <- subset(obj, cells = cells_keep)
@@ -400,6 +425,14 @@ obj <- FindClusters(
 )
 
 obj$seurat_clusters <- as.character(Idents(obj))
+observed_cluster_ids <- sort(unique(obj$seurat_clusters))
+expected_cluster_ids <- names(cluster_labels_short)
+if (!setequal(observed_cluster_ids, expected_cluster_ids)) {
+  stop(
+    "The frozen C0-C10 annotation requires clusters 0-10; observed: ",
+    paste(observed_cluster_ids, collapse = ", ")
+  )
+}
 
 obj <- RunUMAP(
   obj,
@@ -407,6 +440,7 @@ obj <- RunUMAP(
   n.neighbors = UMAP_N_NEIGHBORS,
   min.dist = UMAP_MIN_DIST,
   umap.method = "uwot",
+  seed.use = 12345,
   verbose = FALSE
 )
 
@@ -534,9 +568,11 @@ save_plot(p_4panel, "Figure_4A_UMAP_4panel.png", w = 17, h = 5)
 # -----------------------------
 # FIGURE 3: UMAP clusters clean
 # -----------------------------
+umap_coordinates <- as.data.frame(Embeddings(obj_biological, "umap"))
+colnames(umap_coordinates)[1:2] <- c("umap_1", "umap_2")
 centers <- obj_biological@meta.data %>%
   tibble::rownames_to_column("cell") %>%
-  cbind(Embeddings(obj_biological, "umap")) %>%
+  dplyr::bind_cols(umap_coordinates) %>%
   dplyr::group_by(cluster_short) %>%
   dplyr::summarise(
     umap_1 = median(umap_1),
@@ -672,26 +708,63 @@ write.csv(
 )
 
 # -----------------------------
-# Exploratory cell-level marker ranking for cluster annotation. These tests do
-# not constitute biological-replicate inference between experimental groups.
+# Exploratory cell-level marker rankings. The C0-C9-only run reproduces the
+# comparison population used to freeze the transferred signatures. A separate
+# all-cluster run retains C10-versus-rest evidence for reviewing its
+# post-clustering exclusion. These tests do not constitute biological-replicate
+# inference between experimental groups.
 # -----------------------------
+DefaultAssay(obj) <- "RNA"
 DefaultAssay(obj_biological) <- "RNA"
 
-markers <- tryCatch(
-  FindAllMarkers(
-    obj_biological,
-    only.pos = TRUE,
-    test.use = "wilcox",
-    logfc.threshold = 0.25,
-    min.pct = 0.1
-  ),
-  error = function(e) {
-    message("FindAllMarkers failed: ", e$message)
-    data.frame()
-  }
+markers_all <- FindAllMarkers(
+  obj,
+  only.pos = TRUE,
+  test.use = "wilcox",
+  logfc.threshold = 0.25,
+  min.pct = 0.1
+)
+if (nrow(markers_all) == 0L) {
+  stop("All-cluster marker table is empty; C10 exclusion cannot be reviewed.")
+}
+marker_counts_all <- markers_all %>%
+  dplyr::mutate(cluster = as.character(.data$cluster)) %>%
+  dplyr::count(.data$cluster, name = "n_markers")
+expected_all_clusters <- as.character(0:10)
+if (!setequal(marker_counts_all$cluster, expected_all_clusters) ||
+    any(marker_counts_all$n_markers[
+      match(expected_all_clusters, marker_counts_all$cluster)
+    ] < 20L)) {
+  stop("Every cluster 0-10 must have at least 20 ranked markers for review.")
+}
+data.table::fwrite(
+  markers_all,
+  file.path(FIG_DIR, "Supplementary_Table_S5_all_cluster_markers_including_C10.tsv.gz"),
+  sep = "\t"
+)
+data.table::fwrite(
+  markers_all %>% dplyr::filter(as.character(.data$cluster) == "10"),
+  file.path(FIG_DIR, "Supplementary_Table_S5_C10_markers.tsv"),
+  sep = "\t"
+)
+
+markers <- FindAllMarkers(
+  obj_biological,
+  only.pos = TRUE,
+  test.use = "wilcox",
+  logfc.threshold = 0.25,
+  min.pct = 0.1
 )
 
 if (nrow(markers) > 0) {
+  marker_counts <- markers %>%
+    dplyr::mutate(cluster = as.character(.data$cluster)) %>%
+    dplyr::count(.data$cluster, name = "n_markers")
+  expected_marker_clusters <- as.character(0:9)
+  if (!setequal(marker_counts$cluster, expected_marker_clusters) ||
+      any(marker_counts$n_markers[match(expected_marker_clusters, marker_counts$cluster)] < 20L)) {
+    stop("Every C0-C9 cluster must have at least 20 ranked markers for review.")
+  }
   fc_col <- if ("avg_log2FC" %in% colnames(markers)) {
     "avg_log2FC"
   } else if ("avg_logFC" %in% colnames(markers)) {
@@ -705,6 +778,41 @@ if (nrow(markers) > 0) {
       dplyr::group_by(cluster) %>%
       dplyr::slice_max(order_by = .data[[fc_col]], n = 20, with_ties = FALSE) %>%
       dplyr::ungroup()
+
+    frozen_signatures <- data.table::fread(
+      file.path("resources", "CAR_T_state_signatures.csv"), data.table = FALSE
+    ) %>%
+      dplyr::transmute(
+        cluster = paste0("C", as.character(.data$cluster)),
+        gene = toupper(trimws(as.character(.data$gene)))
+      )
+    current_membership <- top_markers %>%
+      dplyr::transmute(
+        cluster = paste0("C", as.character(.data$cluster)),
+        gene = toupper(trimws(as.character(.data$gene)))
+      )
+    signature_concordance <- dplyr::bind_rows(lapply(paste0("C", 0:9), function(cl) {
+      frozen_genes <- frozen_signatures$gene[frozen_signatures$cluster == cl]
+      current_genes <- current_membership$gene[current_membership$cluster == cl]
+      dplyr::tibble(
+        cluster = cl,
+        n_frozen = length(frozen_genes),
+        n_current = length(current_genes),
+        n_overlap = length(intersect(frozen_genes, current_genes)),
+        exact_membership_match = setequal(frozen_genes, current_genes)
+      )
+    }))
+    data.table::fwrite(
+      signature_concordance,
+      file.path(FIG_DIR, "Supplementary_Table_S5_signature_concordance.tsv"),
+      sep = "\t"
+    )
+    if (any(!signature_concordance$exact_membership_match)) {
+      stop(
+        "Current C0-C9 top-20 markers do not match the frozen signatures; ",
+        "manual marker/label review is required before figure release."
+      )
+    }
 
     wb <- openxlsx::createWorkbook()
 
@@ -727,10 +835,10 @@ if (nrow(markers) > 0) {
       overwrite = TRUE
     )
   } else {
-    warning("Could not find avg_log2FC or avg_logFC column in markers table.")
+    stop("Could not find avg_log2FC or avg_logFC column in markers table.")
   }
 } else {
-  warning("Markers table is empty; Supplementary_Table_S5_top_markers_per_cluster.xlsx was not created.")
+  stop("Marker table is empty; cluster annotations cannot be release-validated.")
 }
 
 # -----------------------------
@@ -797,8 +905,7 @@ save_plot(p_bar_facet, "Figure_4B_cluster_fraction_facet.png", w = 4.8, h = 10)
 
 
 # ============================================================
-# TCR single-cell analysis from TCR.xlsx
-# adapted from BD Rhapsody targeted T-cell panel pipeline
+# Repeated-stimulation analysis of BD Rhapsody targeted T-cell panel data.
 # TCR cluster numbers are dataset-specific and are not mapped onto the
 # independently clustered CAR-T dataset.
 # ============================================================
@@ -810,17 +917,16 @@ install_if_missing <- function(pkgs) {
   missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing) == 0) return(invisible(TRUE))
   stop("Missing required packages: ", paste(missing, collapse = ", "),
-       ". Install the locked versions listed in README.md before running.")
+       ". Install and record the required versions before running.")
 }
 
 needed <- c(
-  "readxl", "Matrix", "Seurat", "dplyr", "tidyr", "tibble",
-  "ggplot2", "patchwork", "data.table", "scales", "openxlsx"
+  "Matrix", "Seurat", "dplyr", "tidyr", "tibble",
+  "ggplot2", "patchwork", "data.table", "R.utils", "scales", "openxlsx"
 )
 install_if_missing(needed)
 
 suppressPackageStartupMessages({
-  library(readxl)
   library(Matrix)
   library(Seurat)
   library(dplyr)
@@ -840,8 +946,10 @@ suppressPackageStartupMessages({
 # -----------------------------
 # Input file
 # -----------------------------
-FILE_TCR <- file.path("data", "singlecell", "TCR.xlsx")
-SHEET_TO_USE <- "all cells"
+FILE_TCR <- file.path(
+  "data", "experimental", "singlecell", "TCR_targeted_counts.tsv.gz"
+)
+SOURCE_SUBSET <- "CD3+ cells"
 
 # -----------------------------
 # Output directory
@@ -878,49 +986,53 @@ cluster_palette <- c(
 # Utilities
 # -----------------------------
 save_plot <- function(p, fn, w = 7, h = 6, dpi = 600) {
+  png_path <- file.path(FIG_DIR, fn)
   ggsave(
-    filename = file.path(FIG_DIR, fn),
+    filename = png_path,
     plot = p,
     width = w,
     height = h,
     dpi = dpi,
     bg = "white"
   )
+  tiff_path <- file.path(
+    FIG_DIR,
+    paste0(tools::file_path_sans_ext(basename(fn)), ".tiff")
+  )
+  ggsave(
+    filename = tiff_path,
+    plot = p,
+    width = w,
+    height = h,
+    dpi = dpi,
+    compression = "lzw",
+    bg = "white"
+  )
 }
 
-read_bd_xlsx_matrix <- function(path, sheet = NULL) {
-  sheets <- readxl::excel_sheets(path)
-  if (length(sheets) == 0) stop("No sheets found in: ", path)
-
-  if (is.null(sheet)) {
-    sh <- sheets[1]
-  } else {
-    if (!sheet %in% sheets) {
-      stop(
-        "Sheet '", sheet, "' not found in: ", path,
-        ". Available sheets: ", paste(sheets, collapse = ", ")
-      )
-    }
-    sh <- sheet
+read_targeted_count_matrix <- function(path) {
+  df <- data.table::fread(path, data.table = FALSE, check.names = FALSE)
+  if (ncol(df) < 2L || names(df)[1] != "cell_index") {
+    stop("Unexpected targeted-count table schema: ", path)
   }
-
-  df <- readxl::read_excel(path, sheet = sh)
-  df <- as.data.frame(df)
-
-  if (ncol(df) < 2) stop("Input file has too few columns: ", path)
-
-  first_col <- colnames(df)[1]
-  cell_ids <- make.unique(as.character(df[[first_col]]))
+  cell_ids <- trimws(as.character(df[[1]]))
+  if (any(is.na(cell_ids) | cell_ids == "") || anyDuplicated(cell_ids)) {
+    stop("Missing or duplicate cell identifier(s) in: ", path)
+  }
   expr_df <- df[, -1, drop = FALSE]
-
-  expr_df[] <- lapply(expr_df, function(x) suppressWarnings(as.numeric(x)))
-  expr_df[is.na(expr_df)] <- 0
-
+  gene_names <- trimws(colnames(expr_df))
+  if (any(is.na(gene_names) | gene_names == "") || anyDuplicated(gene_names)) {
+    stop("Missing or duplicate gene name(s) in: ", path)
+  }
   expr_mat_cell_gene <- as.matrix(expr_df)
+  storage.mode(expr_mat_cell_gene) <- "numeric"
+  if (any(!is.finite(expr_mat_cell_gene))) {
+    stop("The count matrix contains missing or non-numeric value(s): ", path)
+  }
+  if (any(expr_mat_cell_gene < 0) || any(expr_mat_cell_gene %% 1 != 0)) {
+    stop("The count matrix must contain non-negative integer counts: ", path)
+  }
   rownames(expr_mat_cell_gene) <- cell_ids
-
-  gene_names <- colnames(expr_df)
-  gene_names <- make.unique(gene_names)
 
   counts <- t(expr_mat_cell_gene)
   rownames(counts) <- gene_names
@@ -929,7 +1041,7 @@ read_bd_xlsx_matrix <- function(path, sheet = NULL) {
 
   list(
     counts = counts,
-    sheet_used = sh,
+    source_subset = SOURCE_SUBSET,
     n_genes = nrow(counts),
     n_cells = ncol(counts)
   )
@@ -938,13 +1050,14 @@ read_bd_xlsx_matrix <- function(path, sheet = NULL) {
 # -----------------------------
 # Read TCR file
 # -----------------------------
+set.seed(12345)
 if (!file.exists(FILE_TCR)) stop("Missing input file: ", FILE_TCR)
 
-dat <- read_bd_xlsx_matrix(FILE_TCR, sheet = SHEET_TO_USE)
+dat <- read_targeted_count_matrix(FILE_TCR)
 counts <- dat$counts
 
 message(
-  "Loaded TCR | sheet=", dat$sheet_used,
+  "Loaded TCR | source subset=", dat$source_subset,
   " | genes=", dat$n_genes,
   " | cells=", dat$n_cells
 )
@@ -957,7 +1070,7 @@ obj <- CreateSeuratObject(
 )
 
 obj$sample <- "TCR"
-obj$sheet  <- dat$sheet_used
+obj$source_subset <- dat$source_subset
 
 obj <- JoinLayers(obj, assay = "RNA")
 
@@ -981,6 +1094,21 @@ meta_qc <- meta_before %>%
       (nFeature_RNA <= nFeature_high) &
       (nCount_RNA   <= nCount_high)
   )
+
+tcr_qc_summary <- data.frame(
+  sample = "TCR",
+  input_cells = nrow(meta_qc),
+  retained_cells = sum(meta_qc$pass_qc),
+  excluded_cells = sum(!meta_qc$pass_qc),
+  nFeature_low = nFeature_low,
+  nFeature_high = nFeature_high,
+  nCount_high = nCount_high
+)
+data.table::fwrite(
+  tcr_qc_summary,
+  file.path(FIG_DIR, "Figure_5A_TCR_cell_filtering_QC.tsv"),
+  sep = "\t"
+)
 
 cells_keep <- meta_qc$cell[meta_qc$pass_qc]
 obj <- subset(obj, cells = cells_keep)
@@ -1067,6 +1195,7 @@ obj <- RunUMAP(
   n.neighbors = UMAP_N_NEIGHBORS,
   min.dist = UMAP_MIN_DIST,
   umap.method = "uwot",
+  seed.use = 12345,
   verbose = FALSE
 )
 
@@ -1083,6 +1212,12 @@ tcr_cluster_labels <- c(
 )
 
 cluster_ids <- sort(unique(as.integer(as.character(obj$seurat_clusters))))
+if (!identical(cluster_ids, 0:5)) {
+  stop(
+    "The frozen repeated-stimulation annotation requires clusters 0-5; observed: ",
+    paste(cluster_ids, collapse = ", ")
+  )
+}
 cluster_labels_short <- setNames(paste0("C", cluster_ids), as.character(cluster_ids))
 
 expected_tcr_clusters <- paste0("C", cluster_ids)
@@ -1128,9 +1263,11 @@ short_umap_labels <- c(
 
 # Data-derived label positions avoid hard-coded coordinates and remain valid
 # if the UMAP layout changes after a package update.
+umap_coordinates <- as.data.frame(Embeddings(obj, "umap"))
+colnames(umap_coordinates)[1:2] <- c("umap_1", "umap_2")
 centers <- obj@meta.data %>%
   tibble::rownames_to_column("cell") %>%
-  dplyr::bind_cols(as.data.frame(Embeddings(obj, "umap"))) %>%
+  dplyr::bind_cols(umap_coordinates) %>%
   dplyr::group_by(cluster_short, cluster_annot) %>%
   dplyr::summarise(
     umap_1 = median(umap_1),
@@ -1255,21 +1392,23 @@ write.csv(
 # -----------------------------
 DefaultAssay(obj) <- "RNA"
 
-markers <- tryCatch(
-  FindAllMarkers(
-    obj,
-    only.pos = TRUE,
-    test.use = "wilcox",
-    logfc.threshold = 0.25,
-    min.pct = 0.1
-  ),
-  error = function(e) {
-    message("FindAllMarkers failed: ", e$message)
-    data.frame()
-  }
+markers <- FindAllMarkers(
+  obj,
+  only.pos = TRUE,
+  test.use = "wilcox",
+  logfc.threshold = 0.25,
+  min.pct = 0.1
 )
 
 if (nrow(markers) > 0) {
+  marker_counts <- markers %>%
+    dplyr::mutate(cluster = as.character(.data$cluster)) %>%
+    dplyr::count(.data$cluster, name = "n_markers")
+  expected_marker_clusters <- as.character(0:5)
+  if (!setequal(marker_counts$cluster, expected_marker_clusters) ||
+      any(marker_counts$n_markers[match(expected_marker_clusters, marker_counts$cluster)] < 20L)) {
+    stop("Every TCR cluster 0-5 must have at least 20 ranked markers for annotation review.")
+  }
   fc_col <- if ("avg_log2FC" %in% colnames(markers)) {
     "avg_log2FC"
   } else if ("avg_logFC" %in% colnames(markers)) {
@@ -1304,19 +1443,20 @@ if (nrow(markers) > 0) {
       overwrite = TRUE
     )
   } else {
-    warning("Could not find avg_log2FC or avg_logFC column in markers table.")
+    stop("Could not find avg_log2FC or avg_logFC column in TCR marker table.")
   }
 } else {
-  warning("Markers table is empty; top_markers_per_cluster_TCR.xlsx was not created.")
+  stop("TCR marker table is empty; cluster annotations cannot be release-validated.")
 }
 
 # -----------------------------
 # Save object
 # -----------------------------
 saveRDS(obj, file.path(FIG_DIR, "TCR_seurat_object.rds"))
+writeLines(capture.output(sessionInfo()), file.path(FIG_DIR, "sessionInfo_R05.txt"))
 
 # -----------------------------
 # Done
 message("DONE.")
-message("Sheet used: ", SHEET_TO_USE)
+message("Source subset: ", SOURCE_SUBSET)
 message("All outputs saved in: ", FIG_DIR)
