@@ -1,8 +1,10 @@
 # Figure 1B-C: WT cytokine-response differential expression.
 #
 # Input is generated from the canonical 24-sample integer count matrix by
-# scripts/run_bulk_rnaseq_pydeseq2.py. Both the volcano plots and the overlap
-# analysis use the same unfiltered, full-gene-universe adapter.
+# scripts/run_bulk_rnaseq_pydeseq2.py. Volcano backgrounds contain every
+# modelled gene with a finite adjusted p-value. The prespecified baseMean,
+# fold-change and FDR thresholds are used only for DEG classification and the
+# overlap analysis.
 
 required_packages <- c("ggplot2", "ggrepel", "VennDiagram")
 missing_packages <- required_packages[
@@ -46,19 +48,22 @@ label_genes <- c(
 
 make_wt_volcano <- function(condition, panel_title, output_stem) {
   condition_rows <- wt_cytokine[wt_cytokine$condition == condition, , drop = FALSE]
-  genes <- tested_bulk_rows(condition_rows)
+  genes <- plottable_bulk_rows(condition_rows)
   if (!nrow(genes)) {
-    stop("No tested genes remain for the ", condition, " volcano plot.")
+    stop("No modelled genes with finite adjusted p-values remain for the ",
+         condition, " volcano plot.")
   }
 
   genes$adjusted_p_value_plot <- pmax(genes$adjusted_p_value, 1e-300)
   genes$minus_log10_adjusted_p <- -log10(genes$adjusted_p_value_plot)
   genes$status <- factor(
     ifelse(
-      genes$effect > 1 & genes$adjusted_p_value < 0.05,
+      genes$base_mean >= 30 & genes$effect > 1 &
+        genes$adjusted_p_value < 0.05,
       "Upregulated",
       ifelse(
-        genes$effect < -1 & genes$adjusted_p_value < 0.05,
+        genes$base_mean >= 30 & genes$effect < -1 &
+          genes$adjusted_p_value < 0.05,
         "Downregulated",
         "Not significant"
       )
@@ -66,7 +71,11 @@ make_wt_volcano <- function(condition, panel_title, output_stem) {
     levels = c("Upregulated", "Downregulated", "Not significant")
   )
 
-  label_data <- genes[genes$gene_symbol_key %in% label_genes, , drop = FALSE]
+  label_data <- genes[
+    genes$base_mean >= 30 & genes$gene_symbol_key %in% label_genes,
+    ,
+    drop = FALSE
+  ]
   y_limit <- max(20, ceiling(max(genes$minus_log10_adjusted_p, na.rm = TRUE)) + 2)
 
   plot <- ggplot2::ggplot(
@@ -131,7 +140,7 @@ make_wt_volcano(
   "Figure_1B_TNF_IFNg_volcano"
 )
 
-# Figure 1C uses the same threshold and tested-row definition as Figure 1B.
+# Figure 1C uses the prespecified DEG threshold used for volcano colouring.
 figure_conditions <- c("TNF", "IFNG", "TNF_IFNG")
 tested_by_condition <- setNames(
   lapply(figure_conditions, function(condition) {

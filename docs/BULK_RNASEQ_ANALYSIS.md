@@ -60,8 +60,9 @@ For each cytokine condition, the numeric contrast is:
 
 It therefore tests whether the treatment response differs by genotype. These
 difference-in-differences results are not interchangeable with the
-within-treatment KO1-versus-WT contrasts used in the figures. They must not be
-reported until the pinned workflow has run and its QC has been inspected.
+within-treatment KO1-versus-WT contrasts used in the figures. The pinned
+24-sample workflow was run for the release snapshot and the three complete
+interaction tables are retained under `data/experimental/bulk_rnaseq/derived/`.
 
 ## Output contract
 
@@ -120,6 +121,6 @@ The R scripts must use the snake-case effect columns declared above; the
 legacy workbooks and their historical column aliases must not be mixed with
 these regenerated adapters.
 
-`requirements-bulk-rnaseq.txt` pins the direct analysis dependency. The
-release run must retain `environment.freeze.txt`; the direct pin alone is not
-a complete transitive environment lock.
+`requirements-bulk-rnaseq.txt` records the complete exact Python 3.12.13
+environment used for the release run. The byte-identical runtime snapshot is
+also retained as `environment.freeze.txt` with the derived results.

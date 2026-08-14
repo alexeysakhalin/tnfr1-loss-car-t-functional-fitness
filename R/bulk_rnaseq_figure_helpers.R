@@ -146,7 +146,15 @@ read_bulk_figure_adapter <- function(path, expected_conditions,
 tested_bulk_rows <- function(adapter, minimum_base_mean = 30) {
   adapter[
     !is.na(adapter$base_mean) & adapter$base_mean >= minimum_base_mean &
-      is.finite(adapter$effect) & !is.na(adapter$adjusted_p_value),
+      is.finite(adapter$effect) & is.finite(adapter$adjusted_p_value),
+    ,
+    drop = FALSE
+  ]
+}
+
+plottable_bulk_rows <- function(adapter) {
+  adapter[
+    is.finite(adapter$effect) & is.finite(adapter$adjusted_p_value),
     ,
     drop = FALSE
   ]
@@ -156,6 +164,7 @@ write_bulk_figure_qc <- function(adapter, path, minimum_base_mean = 30) {
   split_adapter <- split(adapter, adapter$condition)
   rows <- lapply(names(split_adapter), function(condition) {
     current <- split_adapter[[condition]]
+    plottable <- plottable_bulk_rows(current)
     tested <- tested_bulk_rows(current, minimum_base_mean)
     triplet <- is.finite(current$effect) & is.finite(current$lfc_se) &
       is.finite(current$wald_statistic)
@@ -165,6 +174,7 @@ write_bulk_figure_qc <- function(adapter, path, minimum_base_mean = 30) {
       condition = condition,
       full_universe_symbols = nrow(current),
       complete_wald_triplets = sum(triplet),
+      plottable_modelled_symbols = nrow(plottable),
       tested_base_mean_ge_30 = nrow(tested),
       fdr_below_0_05 = sum(tested$adjusted_p_value < 0.05),
       up_lfc_gt_1_fdr_below_0_05 = sum(

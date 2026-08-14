@@ -204,6 +204,8 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         self.assertIn("expected_statistic <-", helper)
         self.assertIn("observed_statistic <-", helper)
         self.assertIn("lfc_se must be positive", helper)
+        self.assertIn("plottable_bulk_rows <- function(adapter)", helper)
+        self.assertIn("plottable_modelled_symbols = nrow(plottable)", helper)
 
         figure_1 = (ROOT / "R" / "03_figure_1_B_C.R").read_text(
             encoding="utf-8"
@@ -221,6 +223,8 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         self.assertIn('figure_dir <- file.path("figures", "figure_1")', figure_1)
         self.assertIn('result_dir <- file.path("results", "figure_1")', figure_1)
         self.assertIn("Figure_1C_upregulated_overlap", figure_1)
+        self.assertIn("genes <- plottable_bulk_rows(condition_rows)", figure_1)
+        self.assertIn("genes$base_mean >= 30 & genes$effect > 1", figure_1)
         self.assertIn(
             "figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz",
             figure_2,
@@ -230,6 +234,8 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         self.assertIn('figure_dir <- file.path("figures", "figure_2")', figure_2)
         self.assertIn('result_dir <- file.path("results", "figure_2")', figure_2)
         self.assertIn("Supplementary_Figure_S2D_downregulated_overlap", figure_2)
+        self.assertIn("genes <- plottable_bulk_rows(condition_rows)", figure_2)
+        self.assertIn("genes$base_mean >= 30 & genes$effect < -1", figure_2)
         self.assertIn(
             'expected_conditions <- c("control", "IFNG", "TNF", "TNF_IFNG")',
             figure_2,
