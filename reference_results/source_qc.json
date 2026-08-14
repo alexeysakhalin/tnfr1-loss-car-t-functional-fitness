@@ -1,0 +1,28 @@
+{
+  "rna_samples": 311,
+  "arm_counts": {
+    "NIVOLUMAB": 181,
+    "EVEROLIMUS": 130
+  },
+  "trial_by_arm": {
+    "EVEROLIMUS": {
+      "CM-009": 0,
+      "CM-010": 0,
+      "CM-025": 130
+    },
+    "NIVOLUMAB": {
+      "CM-009": 16,
+      "CM-010": 45,
+      "CM-025": 120
+    }
+  },
+  "OS_CNSR_counts": {
+    "1": 231,
+    "0": 80
+  },
+  "PFS_CNSR_counts": {
+    "1": 276,
+    "0": 35
+  },
+  "event_coding_used": "source CNSR value 1 = observed event; 0 = censored"
+}
