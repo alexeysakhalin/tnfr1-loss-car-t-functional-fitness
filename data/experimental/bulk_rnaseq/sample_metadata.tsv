@@ -1,0 +1,25 @@
+sample_id	source_column	cell_line	antigen_status	genotype	source_clone	treatment	tnf_ng_ml	ifng_ng_ml	treatment_duration_h	replicate	replicate_unit	paired_batch_status
+WT_IFNG_R1	IFN__1_Read_Count	HeLa	CD19_positive	WT		IFNG	0	50	48	1	independent_experiment	not_confirmed
+WT_IFNG_R2	IFN__2_Read_Count	HeLa	CD19_positive	WT		IFNG	0	50	48	2	independent_experiment	not_confirmed
+WT_IFNG_R3	IFN__3_Read_Count	HeLa	CD19_positive	WT		IFNG	0	50	48	3	independent_experiment	not_confirmed
+WT_TNF_R1	TNF__1_Read_Count	HeLa	CD19_positive	WT		TNF	50	0	48	1	independent_experiment	not_confirmed
+WT_TNF_R2	TNF__2_Read_Count	HeLa	CD19_positive	WT		TNF	50	0	48	2	independent_experiment	not_confirmed
+WT_TNF_R3	TNF__3_Read_Count	HeLa	CD19_positive	WT		TNF	50	0	48	3	independent_experiment	not_confirmed
+WT_TNF_IFNG_R1	TI__1_Read_Count	HeLa	CD19_positive	WT		TNF_IFNG	50	50	48	1	independent_experiment	not_confirmed
+WT_TNF_IFNG_R2	TI__2_Read_Count	HeLa	CD19_positive	WT		TNF_IFNG	50	50	48	2	independent_experiment	not_confirmed
+WT_TNF_IFNG_R3	TI__3_Read_Count	HeLa	CD19_positive	WT		TNF_IFNG	50	50	48	3	independent_experiment	not_confirmed
+WT_control_R1	HELA_1_Read_Count	HeLa	CD19_positive	WT		control	0	0	48	1	independent_experiment	not_confirmed
+WT_control_R2	HELA_2_Read_Count	HeLa	CD19_positive	WT		control	0	0	48	2	independent_experiment	not_confirmed
+WT_control_R3	HELA_3_Read_Count	HeLa	CD19_positive	WT		control	0	0	48	3	independent_experiment	not_confirmed
+TNFR1_KO1_IFNG_R1	T6_IFN__1_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	IFNG	0	50	48	1	independent_experiment	not_confirmed
+TNFR1_KO1_IFNG_R2	T6_IFN__2_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	IFNG	0	50	48	2	independent_experiment	not_confirmed
+TNFR1_KO1_IFNG_R3	T6_IFN__3_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	IFNG	0	50	48	3	independent_experiment	not_confirmed
+TNFR1_KO1_TNF_IFNG_R1	T6_TI__1_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	TNF_IFNG	50	50	48	1	independent_experiment	not_confirmed
+TNFR1_KO1_TNF_IFNG_R2	T6_TI__2_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	TNF_IFNG	50	50	48	2	independent_experiment	not_confirmed
+TNFR1_KO1_TNF_IFNG_R3	T6_TI__3_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	TNF_IFNG	50	50	48	3	independent_experiment	not_confirmed
+TNFR1_KO1_TNF_R1	T6_TNF__1_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	TNF	50	0	48	1	independent_experiment	not_confirmed
+TNFR1_KO1_TNF_R2	T6_TNF__2_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	TNF	50	0	48	2	independent_experiment	not_confirmed
+TNFR1_KO1_TNF_R3	T6_TNF__3_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	TNF	50	0	48	3	independent_experiment	not_confirmed
+TNFR1_KO1_control_R1	T6_1_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	control	0	0	48	1	independent_experiment	not_confirmed
+TNFR1_KO1_control_R2	T6_2_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	control	0	0	48	2	independent_experiment	not_confirmed
+TNFR1_KO1_control_R3	T6_3_Read_Count	HeLa	CD19_positive	TNFR1_KO1	T6	control	0	0	48	3	independent_experiment	not_confirmed

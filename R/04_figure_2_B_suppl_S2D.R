@@ -1,287 +1,274 @@
-# Figure 2B and Supplementary Figure S2D: matched T6-versus-WT RNA-seq.
+# Figure 2B and Supplementary Figure S2D: TNFR1-KO1 versus WT.
 #
-# T6 is the internal identifier present in the supplied design workbook. The
-# script does not relabel T6 as KO1 or KO2 because that mapping is not encoded
-# in the data and must be confirmed from the experimental sample key.
+# The canonical source calls TNFR1-KO1 "T6". The adapter used here is generated
+# from the integer count matrix by scripts/run_bulk_rnaseq_pydeseq2.py. Positive
+# log2 fold change means higher expression in TNFR1-KO1 than in WT within the
+# indicated treatment stratum; these are not genotype-by-treatment interactions.
 
-required_packages <- c(
-  "data.table", "R.utils", "dplyr", "ggplot2", "ggrepel", "VennDiagram"
-)
+required_packages <- c("ggplot2", "ggrepel", "VennDiagram")
 missing_packages <- required_packages[
   !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
 ]
-if (length(missing_packages) > 0L) {
-  stop("Missing required packages: ", paste(missing_packages, collapse = ", "))
+if (length(missing_packages)) {
+  stop("Install required packages: ", paste(missing_packages, collapse = ", "), ".")
 }
 
-suppressPackageStartupMessages({
-  library(data.table)
-  library(dplyr)
-  library(ggplot2)
-  library(ggrepel)
-})
+source(file.path("R", "bulk_rnaseq_figure_helpers.R"))
+
+input_path <- file.path(
+  "data", "experimental", "bulk_rnaseq", "derived",
+  "figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz"
+)
+expected_conditions <- c("control", "IFNG", "TNF", "TNF_IFNG")
+effect_column <- "log2_fold_change_ko1_vs_wt"
+statistic_column <- "wald_statistic_ko1_vs_wt"
+
+ko1_vs_wt <- read_bulk_figure_adapter(
+  path = input_path,
+  expected_conditions = expected_conditions,
+  effect_column = effect_column,
+  statistic_column = statistic_column
+)
 
 figure_dir <- file.path("figures", "figure_2")
-table_dir <- file.path("results", "figure_2")
+result_dir <- file.path("results", "figure_2")
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
-dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
-
-input_paths <- c(
-  UNTREATED = file.path(
-    "data", "experimental", "hela_t6_vs_wt_untreated_differential_expression.tsv.gz"
-  ),
-  IFN = file.path(
-    "data", "experimental", "hela_t6_vs_wt_ifn_differential_expression.tsv.gz"
-  ),
-  TNF = file.path(
-    "data", "experimental", "hela_t6_vs_wt_tnf_differential_expression.tsv.gz"
-  ),
-  TI = file.path(
-    "data", "experimental", "hela_t6_vs_wt_ti_differential_expression.tsv.gz"
-  )
+dir.create(result_dir, recursive = TRUE, showWarnings = FALSE)
+write_bulk_figure_qc(
+  ko1_vs_wt,
+  file.path(result_dir, "Figure_2B_S2D_input_qc.tsv")
 )
 
-required_columns <- c(
-  "condition", "gene_symbol", "base_mean", "log2_fold_change_t6_vs_wt",
-  "lfc_se", "wald_statistic_t6_vs_wt", "p_value", "adjusted_p_value"
+condition_display <- c(
+  control = "Untreated",
+  IFNG = "IFNγ",
+  TNF = "TNF",
+  TNF_IFNG = "TNF + IFNγ"
 )
-
-read_condition <- function(condition_name, path) {
-  if (!file.exists(path)) stop("Missing matched DE table: ", path)
-  table <- data.table::fread(path, data.table = FALSE)
-  missing_columns <- setdiff(required_columns, names(table))
-  if (length(missing_columns) > 0L) {
-    stop(path, " is missing columns: ", paste(missing_columns, collapse = ", "))
-  }
-  table <- table[, required_columns]
-  if (!identical(unique(table$condition), condition_name)) {
-    stop("Condition label mismatch in ", path)
-  }
-  table$gene_symbol <- toupper(trimws(table$gene_symbol))
-  if (any(table$gene_symbol == "") || anyDuplicated(table$gene_symbol)) {
-    stop("Blank or duplicate gene symbols in ", path)
-  }
-  if (!is.numeric(table$base_mean) || any(!is.finite(table$base_mean)) ||
-      any(table$base_mean < 0)) {
-    stop("Invalid base_mean values in ", path)
-  }
-  effect_columns <- c(
-    "log2_fold_change_t6_vs_wt", "lfc_se", "wald_statistic_t6_vs_wt"
-  )
-  effect_missing <- is.na(table[effect_columns])
-  if (any(rowSums(effect_missing) > 0 & rowSums(effect_missing) < 3L)) {
-    stop("Partially missing LFC/SE/Wald triplet in ", path)
-  }
-  effect_available <- !is.na(table$log2_fold_change_t6_vs_wt)
-  if (any(!is.finite(as.matrix(table[effect_available, effect_columns])))) {
-    stop("Non-finite LFC/SE/Wald values in ", path)
-  }
-  if (any(table$lfc_se[effect_available] <= 0)) {
-    stop("Non-positive LFC standard error in ", path)
-  }
-  if (!isTRUE(all.equal(
-      table$log2_fold_change_t6_vs_wt[effect_available] /
-        table$lfc_se[effect_available],
-      table$wald_statistic_t6_vs_wt[effect_available],
-      tolerance = 1e-8,
-      check.attributes = FALSE
-    ))) {
-    stop("LFC/SE/Wald relationship is inconsistent in ", path)
-  }
-
-  # DESeq2 can report a finite effect and p-value with padj=NA after independent
-  # filtering, or leave p and padj missing for rows that were not tested. These
-  # are valid missingness patterns and must not be coerced to significance.
-  p_available <- !is.na(table$p_value)
-  padj_available <- !is.na(table$adjusted_p_value)
-  if (any(p_available & !effect_available) || any(padj_available & !p_available)) {
-    stop("Invalid p-value missingness pattern in ", path)
-  }
-  if (any(!is.finite(table$p_value[p_available])) ||
-      any(table$p_value[p_available] < 0 | table$p_value[p_available] > 1) ||
-      any(!is.finite(table$adjusted_p_value[padj_available])) ||
-      any(table$adjusted_p_value[padj_available] < 0 |
-          table$adjusted_p_value[padj_available] > 1)) {
-    stop("Invalid DE p-value in ", path)
-  }
-  table
+if (!identical(names(condition_display), expected_conditions)) {
+  stop("Internal condition-display mapping is incomplete.")
 }
-
-tables <- Map(read_condition, names(input_paths), unname(input_paths))
-names(tables) <- names(input_paths)
-gene_sets <- lapply(tables, function(table) sort(table$gene_symbol))
-if (!all(vapply(gene_sets[-1], identical, logical(1), gene_sets[[1]]))) {
-  stop("The four matched contrasts do not have the same gene universe.")
-}
-
-input_qc <- data.frame(
-  condition = names(tables),
-  n_genes = vapply(tables, nrow, integer(1)),
-  n_effect_estimates = vapply(
-    tables,
-    function(table) sum(!is.na(table$log2_fold_change_t6_vs_wt)),
-    integer(1)
-  ),
-  n_p_values = vapply(
-    tables, function(table) sum(!is.na(table$p_value)), integer(1)
-  ),
-  n_adjusted_p_values = vapply(
-    tables, function(table) sum(!is.na(table$adjusted_p_value)), integer(1)
-  )
-)
-data.table::fwrite(input_qc, file.path(table_dir, "matched_DE_input_qc.tsv"), sep = "\t")
 
 label_genes <- c(
   "CASP3", "CASP7", "CASP8", "CASP9", "BAX", "BAK1", "BCL2", "FAS",
   "APAF1", "GSDMD", "GSDME", "CASP1", "CASP4", "CASP5", "AIM2",
   "NLRP3", "RIPK1", "RIPK3", "MLKL", "ICAM1", "IRF1"
 )
-condition_titles <- c(TNF = "TNF", IFN = "IFNγ", TI = "TNF + IFNγ")
-condition_filenames <- c(TNF = "TNF", IFN = "IFNg", TI = "TNF_IFNg")
 
-make_volcano <- function(condition_name) {
-  plot_data <- tables[[condition_name]] |>
-    filter(
-      base_mean >= 30,
-      !is.na(log2_fold_change_t6_vs_wt),
-      !is.na(adjusted_p_value)
-    ) |>
-    mutate(
-      adjusted_p_plot = pmax(adjusted_p_value, .Machine$double.xmin),
-      significance = case_when(
-        log2_fold_change_t6_vs_wt > 1 & adjusted_p_value < 0.05 ~ "Upregulated",
-        log2_fold_change_t6_vs_wt < -1 & adjusted_p_value < 0.05 ~ "Downregulated",
-        TRUE ~ "Not significant"
+make_ko1_volcano <- function(condition, panel_title, output_stem) {
+  condition_rows <- ko1_vs_wt[ko1_vs_wt$condition == condition, , drop = FALSE]
+  genes <- tested_bulk_rows(condition_rows)
+  if (!nrow(genes)) {
+    stop("No tested genes remain for the ", condition, " volcano plot.")
+  }
+
+  genes$adjusted_p_value_plot <- pmax(genes$adjusted_p_value, 1e-300)
+  genes$minus_log10_adjusted_p <- -log10(genes$adjusted_p_value_plot)
+  genes$status <- factor(
+    ifelse(
+      genes$effect > 1 & genes$adjusted_p_value < 0.05,
+      "Upregulated",
+      ifelse(
+        genes$effect < -1 & genes$adjusted_p_value < 0.05,
+        "Downregulated",
+        "Not significant"
       )
-    )
-  labels <- plot_data |>
-    filter(gene_symbol %in% label_genes)
+    ),
+    levels = c("Upregulated", "Downregulated", "Not significant")
+  )
 
-  plot <- ggplot(
-    plot_data,
-    aes(x = log2_fold_change_t6_vs_wt, y = -log10(adjusted_p_plot))
+  label_data <- genes[genes$gene_symbol_key %in% label_genes, , drop = FALSE]
+  y_limit <- max(20, ceiling(max(genes$minus_log10_adjusted_p, na.rm = TRUE)) + 2)
+
+  plot <- ggplot2::ggplot(
+    genes,
+    ggplot2::aes(x = effect, y = minus_log10_adjusted_p)
   ) +
-    geom_point(aes(color = significance), size = 1.1, alpha = 0.75) +
-    geom_vline(xintercept = c(-1, 1), linetype = "dashed", linewidth = 0.35) +
-    geom_hline(yintercept = -log10(0.05), linetype = "dashed", linewidth = 0.35) +
-    ggrepel::geom_text_repel(
-      data = labels,
-      aes(label = gene_symbol),
-      seed = 42,
-      size = 3.2,
-      min.segment.length = 0,
-      max.overlaps = Inf
-    ) +
-    scale_color_manual(
+    ggplot2::geom_point(ggplot2::aes(color = status), size = 1.8, alpha = 0.80) +
+    ggplot2::scale_color_manual(
       values = c(
-        "Upregulated" = "#D1495B",
-        "Downregulated" = "#2B6CB0",
-        "Not significant" = "grey75"
+        "Upregulated" = "#E64B35",
+        "Downregulated" = "#3182BD",
+        "Not significant" = "grey70"
       ),
-      breaks = c("Upregulated", "Downregulated", "Not significant")
+      drop = FALSE,
+      name = "Status"
     ) +
-    labs(
-      title = condition_titles[[condition_name]],
-      subtitle = "T6 versus WT within treatment condition",
-      x = expression(log[2] * " fold change (T6 vs WT)"),
-      y = expression(-log[10] * " adjusted p-value"),
-      color = NULL
+    ggplot2::geom_vline(
+      xintercept = c(-1, 1), linetype = "dashed", color = "black"
     ) +
-    theme_classic(base_size = 11) +
-    theme(
-      plot.title = element_text(hjust = 0.5),
-      plot.subtitle = element_text(hjust = 0.5)
+    ggplot2::geom_hline(
+      yintercept = -log10(0.05), linetype = "dashed", color = "black"
+    ) +
+    ggplot2::coord_cartesian(xlim = c(-15, 15), ylim = c(0, y_limit), clip = "on") +
+    ggplot2::theme_minimal(base_size = 14) +
+    ggplot2::labs(
+      title = panel_title,
+      x = "Log2 fold change (TNFR1-KO1 vs WT)",
+      y = "-Log10 adjusted p-value"
+    ) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5)) +
+    ggrepel::geom_label_repel(
+      data = label_data,
+      ggplot2::aes(label = gene_symbol),
+      color = "black",
+      size = 4,
+      box.padding = 0.35,
+      point.padding = 0.25,
+      label.padding = grid::unit(0.15, "lines"),
+      label.size = 0,
+      fill = scales::alpha("white", 0.9),
+      segment.color = "black",
+      segment.size = 0.3,
+      min.segment.length = 0,
+      max.overlaps = Inf,
+      seed = 42
     )
 
-  output_base <- paste0(
-    "Figure_2B_", condition_filenames[[condition_name]], "_T6_vs_WT_volcano"
+  save_figure_pair(
+    plot,
+    file.path(figure_dir, output_stem),
+    width = 8,
+    height = 6
   )
-  ggsave(
-    file.path(figure_dir, paste0(output_base, ".png")),
-    plot, width = 7, height = 5.5, units = "in", dpi = 600, bg = "white"
-  )
-  ggsave(
-    file.path(figure_dir, paste0(output_base, ".tiff")),
-    plot, width = 7, height = 5.5, units = "in", dpi = 600,
-    compression = "lzw", bg = "white"
-  )
+  invisible(plot)
 }
-invisible(lapply(c("TNF", "IFN", "TI"), make_volcano))
 
-down_sets <- lapply(c("TNF", "IFN", "TI"), function(condition_name) {
-  table <- tables[[condition_name]]
-  sort(unique(table$gene_symbol[
-    table$base_mean >= 30 &
-      !is.na(table$log2_fold_change_t6_vs_wt) &
-      !is.na(table$adjusted_p_value) &
-      table$log2_fold_change_t6_vs_wt < -1 &
-      table$adjusted_p_value < 0.05
-  ]))
+make_ko1_volcano(
+  "TNF_IFNG",
+  expression("TNF + IFN" * gamma),
+  "Figure_2B_TNF_IFNg"
+)
+make_ko1_volcano("TNF", "TNF", "Figure_2B_TNF")
+make_ko1_volcano("IFNG", expression("IFN" * gamma), "Figure_2B_IFNg")
+
+# Supplementary Figure S2D is restricted to the three cytokine-treated strata.
+figure_conditions <- c("TNF", "IFNG", "TNF_IFNG")
+tested_by_condition <- setNames(
+  lapply(figure_conditions, function(condition) {
+    tested_bulk_rows(ko1_vs_wt[ko1_vs_wt$condition == condition, , drop = FALSE])
+  }),
+  figure_conditions
+)
+downregulated_symbols <- lapply(tested_by_condition, function(frame) {
+  unique(frame$gene_symbol[
+    frame$effect < -1 & frame$adjusted_p_value < 0.05
+  ])
 })
-names(down_sets) <- c("TNF", "IFN", "TI")
 
-n12 <- length(intersect(down_sets$TNF, down_sets$IFN))
-n13 <- length(intersect(down_sets$TNF, down_sets$TI))
-n23 <- length(intersect(down_sets$IFN, down_sets$TI))
-common_down <- sort(Reduce(intersect, down_sets))
-n123 <- length(common_down)
+down_tnf <- downregulated_symbols[["TNF"]]
+down_ifng <- downregulated_symbols[["IFNG"]]
+down_tnf_ifng <- downregulated_symbols[["TNF_IFNG"]]
 
-venn_grob <- VennDiagram::draw.triple.venn(
-  area1 = length(down_sets$TNF),
-  area2 = length(down_sets$IFN),
-  area3 = length(down_sets$TI),
-  n12 = n12,
-  n13 = n13,
-  n23 = n23,
-  n123 = n123,
+venn_plot <- VennDiagram::draw.triple.venn(
+  area1 = length(down_tnf),
+  area2 = length(down_ifng),
+  area3 = length(down_tnf_ifng),
+  n12 = length(intersect(down_tnf, down_ifng)),
+  n23 = length(intersect(down_ifng, down_tnf_ifng)),
+  n13 = length(intersect(down_tnf, down_tnf_ifng)),
+  n123 = length(Reduce(intersect, list(down_tnf, down_ifng, down_tnf_ifng))),
   category = c("TNF", "IFNγ", "TNF + IFNγ"),
   fill = c("#6FC7CF", "#1CC5FE", "#FBA27D"),
   alpha = 0.75,
-  cex = 1.5,
-  cat.cex = 1.4,
-  lwd = 1.5,
+  cex = 2,
+  fontface = "bold",
+  cat.cex = 2,
+  cat.fontface = "bold",
+  lwd = 2,
   scaled = FALSE,
   ind = FALSE
 )
 
-save_venn <- function(path, device) {
-  if (identical(device, "png")) {
-    grDevices::png(path, width = 6, height = 6, units = "in", res = 600)
-  } else {
-    grDevices::tiff(
-      path, width = 6, height = 6, units = "in", res = 600,
-      compression = "lzw"
-    )
-  }
-  on.exit(grDevices::dev.off(), add = TRUE)
-  grid::grid.draw(venn_grob)
+save_venn_pair <- function(venn, stem) {
+  grDevices::tiff(
+    paste0(stem, ".tiff"),
+    width = 6,
+    height = 6,
+    units = "in",
+    res = 600,
+    compression = "lzw"
+  )
+  grid::grid.newpage()
+  grid::grid.draw(venn)
+  grDevices::dev.off()
+
+  grDevices::png(
+    paste0(stem, ".png"),
+    width = 6,
+    height = 6,
+    units = "in",
+    res = 600,
+    bg = "white"
+  )
+  grid::grid.newpage()
+  grid::grid.draw(venn)
+  grDevices::dev.off()
 }
-save_venn(
-  file.path(figure_dir, "Supplementary_Figure_S2D_downregulated_overlap.png"),
-  "png"
-)
-save_venn(
-  file.path(figure_dir, "Supplementary_Figure_S2D_downregulated_overlap.tiff"),
-  "tiff"
+save_venn_pair(
+  venn_plot,
+  file.path(figure_dir, "Supplementary_Figure_S2D_downregulated_overlap")
 )
 
-common_table <- bind_rows(lapply(names(down_sets), function(condition_name) {
-  tables[[condition_name]] |>
-    filter(gene_symbol %in% common_down) |>
-    transmute(
-      condition = condition_name,
-      gene_symbol,
-      base_mean,
-      log2_fold_change_t6_vs_wt,
-      adjusted_p_value
-    )
-})) |>
-  arrange(gene_symbol, factor(condition, levels = c("TNF", "IFN", "TI")))
-data.table::fwrite(
-  common_table,
-  file.path(table_dir, "Supplementary_Figure_S2D_common_downregulated_genes.tsv"),
-  sep = "\t"
+common_downregulated <- sort(
+  Reduce(intersect, list(down_tnf, down_ifng, down_tnf_ifng))
 )
-writeLines(capture.output(sessionInfo()), file.path(table_dir, "sessionInfo.txt"))
+common_stats <- data.frame(
+  gene_symbol = common_downregulated,
+  stringsAsFactors = FALSE
+)
+for (condition in figure_conditions) {
+  current <- tested_by_condition[[condition]]
+  current <- current[current$gene_symbol %in% common_downregulated, , drop = FALSE]
+  suffix <- switch(
+    condition,
+    TNF = "TNF",
+    IFNG = "IFNg",
+    TNF_IFNG = "TNF_IFNg"
+  )
+  condition_stats <- current[
+    , c("gene_symbol", "effect", "adjusted_p_value", "base_mean"), drop = FALSE
+  ]
+  names(condition_stats)[-1] <- c(
+    paste0("log2_fold_change_KO1_vs_WT_", suffix),
+    paste0("adjusted_p_value_", suffix),
+    paste0("base_mean_", suffix)
+  )
+  common_stats <- merge(
+    common_stats,
+    condition_stats,
+    by = "gene_symbol",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  common_stats <- common_stats[
+    match(common_downregulated, common_stats$gene_symbol),
+    ,
+    drop = FALSE
+  ]
+}
 
-message("Figure 2B and Supplementary Figure S2D outputs written to ", figure_dir)
+utils::write.table(
+  data.frame(gene_symbol = common_downregulated, stringsAsFactors = FALSE),
+  file = file.path(
+    result_dir,
+    "Supplementary_Figure_S2D_common_downregulated_genes.tsv"
+  ),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE,
+  col.names = TRUE,
+  na = "NA"
+)
+utils::write.table(
+  common_stats,
+  file = file.path(
+    result_dir,
+    "Supplementary_Figure_S2D_common_downregulated_gene_statistics.tsv"
+  ),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE,
+  col.names = TRUE,
+  na = "NA"
+)

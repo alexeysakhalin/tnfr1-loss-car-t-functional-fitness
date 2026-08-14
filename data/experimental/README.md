@@ -1,8 +1,8 @@
 # Experimental analysis tables
 
 This directory contains compact, non-identifying, author-generated tables used
-by the experimental figure scripts. The eight source Excel workbooks are not
-used directly by R and are not committed here. Their canonical names, byte
+by the experimental figure scripts. The eight legacy result/count workbooks
+are not used directly by R and are not committed here. Their canonical names, byte
 sizes and SHA-256 values are recorded in `experimental_data_manifest.tsv`.
 The manifest uses stable canonical deposition names. Timestamp suffixes added
 by file transfer are removed from those names; the byte-level source identity
@@ -36,29 +36,26 @@ the two-sided p-values are internally consistent. The canonical table retains
 the treatment-versus-untreated fold-change orientation and recalculates the
 Wald statistic as `log2FoldChange / lfcSE`. Source workbooks remain unchanged.
 
-The significant-gene table supports the thresholded overlap in Figure 1C and
-checks of reported gene-level effects. It does not support a conventional
-volcano plot or a complete tested-gene enrichment universe. Figure 1B remains
-locked until full, unfiltered DESeq2 outputs are provided under the schema
-enforced by `R/03_figure_1_B_C.R`.
-
-These tables are processed DE results, not raw-count inputs. The repository
-can reproduce the plotted thresholds from them, but re-estimation of the
-underlying DE models additionally requires the count matrix, design/contrast
-code and locked DESeq2/PyDESeq2 environment in the article-data archive.
+The significant-gene table is retained as a documented legacy input and QC
+cross-check. It is not used to draw the final Figure 1B or Figure 1C. The
+validated Macrogen integer count matrix, sample metadata, complete PyDESeq2
+workflow and full unfiltered release tables are provided under `bulk_rnaseq/`;
+R03 reads the version-controlled complete adapter from that directory.
 
 ## Matched T6-versus-WT RNA-seq
 
 The four `hela_t6_vs_wt_*_differential_expression.tsv.gz` files contain the
-complete condition-specific tables from the matched workbook. The associated
-design contains 24 samples: HeLa and T6, four conditions, three biological
-replicates per cell-line/condition combination. These files support Figure 2B
-and Supplementary Figure S2D.
+condition-specific legacy tables from the matched workbook. The associated
+design contains 24 samples: HeLa and T6, four conditions, three independent
+experiments per cell-line/condition combination. They are retained for source
+cross-checks; final Figure 2B and Supplementary Figure S2D use the count-level
+rerun under `bulk_rnaseq/derived/`.
 
-`T6` is the internal cell-line identifier encoded in the workbook. The file
-does not establish whether T6 corresponds to the manuscript label KO1 or KO2.
-The code therefore preserves `T6`; a signed sample key or author confirmation
-is required before replacing that identifier in the manuscript or figure.
+`T6` is the internal cell-line identifier encoded in the workbook. The authors
+confirmed on 2026-08-14 that T6 corresponds to manuscript clone TNFR1-KO1.
+The canonical table fields preserve `T6` for source-level provenance, while
+figure labels use `TNFR1-KO1`. The mapping is recorded in
+`experimental_sample_aliases.tsv`.
 
 ## Targeted single-cell count matrices
 

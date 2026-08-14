@@ -44,7 +44,8 @@ workbooks. Patient-level public-cohort inputs remain local-only.
 
 ## Software environment
 
-Python 3.12 and R 4.4 are used by the automated checks. Create a Python
+Python 3.12 and R 4.4 are used by the automated checks; the bulk RNA-seq
+release workflow fixes Python 3.12.13. Create a Python
 environment and install the pinned validation dependencies:
 
 ```bash
@@ -58,6 +59,12 @@ The final article release must additionally include the `renv.lock` and
 `sessionInfo()` produced by the clean R/Seurat run. Package versions are not
 guessed before that run is completed.
 
+The bulk RNA-seq model is isolated in a separately pinned Python environment:
+
+```bash
+python -m pip install --requirement requirements-bulk-rnaseq.txt
+```
+
 ## Experimental workflow
 
 The canonical experimental tables are already version-controlled. Their
@@ -69,28 +76,52 @@ rebuild them from the eight source workbooks with:
 python scripts/prepare_experimental_analysis_tables.py --input-dir /path/to/workbooks
 ```
 
-Generate the experimental transcriptomic panels in manuscript order:
+The original bulk RNA-seq workbook has been converted into a deterministic
+Gene_ID-level integer-count matrix with 46,427 features and 24 samples. The
+sample manifest records WT and TNFR1-KO1 cells, four treatment conditions and
+three independent experiments per combination. The internal source clone name
+`T6` is mapped to manuscript clone `TNFR1-KO1`; the only repeated display
+symbol, `TRNAV-CAC`, is summed over its three source Gene_ID records only when
+the symbol-level models are fitted. Source and canonical-table checksums are
+recorded under [`data/experimental/bulk_rnaseq/`](data/experimental/bulk_rnaseq/).
+
+Re-estimate all seven primary contrasts and the three prespecified
+genotype-by-treatment interaction contrasts, then generate the experimental
+bulk-transcriptomic panels in manuscript order:
 
 ```bash
+python scripts/run_bulk_rnaseq_pydeseq2.py \
+  --input-dir data/experimental/bulk_rnaseq \
+  --output-dir results/bulk_rnaseq \
+  --include-interaction \
+  --n-cpus 2
 Rscript R/03_figure_1_B_C.R
 Rscript R/04_figure_2_B_suppl_S2D.R
 Rscript R/05_figure_4_AB_suppl_S5A.R
 ```
 
-The supplied cytokine-versus-untreated DE workbooks contain only rows with
-adjusted *p*<0.05. They support Figure 1C and the reported ICAM1/IRF1 effects,
-but not a conventional full volcano plot. `R/03_figure_1_B_C.R` therefore
-refuses to create Figure 1B until complete unfiltered DESeq2 results are placed
-at the documented path. The matched T6 workbook supports Figure 2B/S2D, but
-the data themselves do not identify whether T6 is manuscript clone KO1 or
-KO2. The code retains the source identifier pending confirmation.
+PyDESeq2 v0.5.4 fits each primary contrast as a separate six-sample model:
+three WT cytokine-versus-untreated comparisons and four TNFR1-KO1-versus-WT
+comparisons within treatment strata. Complete 46,425-symbol result universes,
+including non-significant and explicitly non-estimable rows, are supplied to
+`R/03` and `R/04`. Positive log2 fold changes follow the first-named
+numerator-versus-reference direction, and the exported Wald statistic is
+checked against `log2FoldChange/lfcSE`. Optional full-factorial interaction
+outputs are kept separate from the within-stratum contrasts used in Figure 2B.
+The earlier significant-only Excel exports are retained only as provenance and
+are not used to draw the final volcano plots.
 
-The current bulk experimental inputs are author-generated differential-
-expression result tables. Accordingly, `R/03` and `R/04` reproduce figure
-layers and thresholded gene sets from those results; they do not re-estimate
-the DE models from a raw count matrix. End-to-end DE reproduction requires
-depositing the count matrix, design/contrast code, filtering record and locked
-software environment in the immutable article-data archive.
+The two complete figure-input adapters and the three complete interaction
+tables from the validated release run are version-controlled under
+`data/experimental/bulk_rnaseq/derived/`. Consequently, R03 and R04 can render
+the bulk panels directly from a clean clone. The count-level workflow rebuilds
+these files and the automated workflow requires byte-identical release
+artifacts before rendering.
+
+The `Rebuild bulk RNA-seq figures` GitHub Actions workflow performs the pinned
+count-to-DE run, checks all complete result exports, renders 600-dpi PNG/TIFF
+panels with R 4.4.3 and stores both result and figure artifacts together with
+the runtime records.
 
 The targeted single-cell inputs use the `CD3+ cells` sheets: WT, 3,743 cells;
 KO1, 2,475; KO2, 1,831; and the repeated-stimulation dataset, 5,662. These are
@@ -161,10 +192,15 @@ claim.
 
 ## Release-locked analyses
 
-Supplementary Figure S1B is intentionally release-locked: it must not be used
-until the exact DepMap Public release, Figshare DOI, download date, checksums
-and one-default-profile-per-human-cell-line filtering are supplied. The
-repository does not retain the earlier unverified DepMap percentages.
+Supplementary Figure S1B is intentionally release-locked. The supplied
+expression archive has the profile-level `is_default_entry` schema associated
+with DepMap Public 25Q2, but the archive itself does not identify its release.
+The analysis therefore still requires the same-release `Model.csv`, the
+official release/source URL, download date, checksums and one-default-profile-
+per-human-cell-line filtering. A release DOI is recorded when available but is
+not mandatory because current DepMap releases are distributed directly from
+the portal rather than Figshare. The repository does not retain the earlier
+unverified DepMap percentages.
 
 Supplementary Figure S3 is not generated by the transcriptomic workflow. It
 requires raw FCS files, the compensation/gating record, a defined live-cell

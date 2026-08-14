@@ -1,0 +1,330 @@
+{
+  "canonical_files": {
+    "gene_annotations.tsv.gz": {
+      "sha256": "df62edc5ae7b8f1818d5c6ce3427177cd0aa303c22d5f199229efc9d0fffdbb6",
+      "size_bytes": 1832646
+    },
+    "gene_counts.tsv.gz": {
+      "sha256": "9b3d97e4f1081d1b8bd54b795d5b01542240a47fc94284ead407853cdd26d6af",
+      "size_bytes": 983249
+    },
+    "gene_symbol_membership.tsv.gz": {
+      "sha256": "dde83bcc0df6f1cbfce5e6f86a42c68c56e3f2aa8aa5b9ed9877a335738c88b0",
+      "size_bytes": 261529
+    },
+    "sample_metadata.tsv": {
+      "sha256": "52631fe4cb515b381ff56d4141447405d0b9bf4441bb4ef1901c11017b9e9d27",
+      "size_bytes": 2943
+    }
+  },
+  "count_matrix": {
+    "all_zero_gene_ids_across_all_samples": 17610,
+    "gene_id_rows": 46427,
+    "missing_counts": 0,
+    "negative_counts": 0,
+    "non_integer_counts": 0,
+    "samples": 24,
+    "unique_gene_ids": 46427,
+    "unique_gene_symbols": 46425
+  },
+  "duplicate_gene_symbols": {
+    "TRNAV-CAC": [
+      107985614,
+      107985615,
+      107985753
+    ]
+  },
+  "gene_symbol_aggregation": "For symbol-level analyses, counts are summed over Gene_ID rows before model fitting. This affects only TRNAV-CAC in this source matrix.",
+  "sample_qc": {
+    "TNFR1_KO1_IFNG_R1": {
+      "detected_gene_ids": 20503,
+      "library_size": 45916344
+    },
+    "TNFR1_KO1_IFNG_R2": {
+      "detected_gene_ids": 20720,
+      "library_size": 40876620
+    },
+    "TNFR1_KO1_IFNG_R3": {
+      "detected_gene_ids": 20397,
+      "library_size": 49183987
+    },
+    "TNFR1_KO1_TNF_IFNG_R1": {
+      "detected_gene_ids": 20233,
+      "library_size": 48789863
+    },
+    "TNFR1_KO1_TNF_IFNG_R2": {
+      "detected_gene_ids": 20611,
+      "library_size": 54626245
+    },
+    "TNFR1_KO1_TNF_IFNG_R3": {
+      "detected_gene_ids": 20542,
+      "library_size": 53528687
+    },
+    "TNFR1_KO1_TNF_R1": {
+      "detected_gene_ids": 19885,
+      "library_size": 50136045
+    },
+    "TNFR1_KO1_TNF_R2": {
+      "detected_gene_ids": 19445,
+      "library_size": 49483371
+    },
+    "TNFR1_KO1_TNF_R3": {
+      "detected_gene_ids": 19182,
+      "library_size": 40253514
+    },
+    "TNFR1_KO1_control_R1": {
+      "detected_gene_ids": 19891,
+      "library_size": 50375262
+    },
+    "TNFR1_KO1_control_R2": {
+      "detected_gene_ids": 20406,
+      "library_size": 49961353
+    },
+    "TNFR1_KO1_control_R3": {
+      "detected_gene_ids": 19815,
+      "library_size": 54697509
+    },
+    "WT_IFNG_R1": {
+      "detected_gene_ids": 20803,
+      "library_size": 52031315
+    },
+    "WT_IFNG_R2": {
+      "detected_gene_ids": 20040,
+      "library_size": 53796036
+    },
+    "WT_IFNG_R3": {
+      "detected_gene_ids": 20627,
+      "library_size": 58842847
+    },
+    "WT_TNF_IFNG_R1": {
+      "detected_gene_ids": 20257,
+      "library_size": 53673677
+    },
+    "WT_TNF_IFNG_R2": {
+      "detected_gene_ids": 19984,
+      "library_size": 54194471
+    },
+    "WT_TNF_IFNG_R3": {
+      "detected_gene_ids": 20007,
+      "library_size": 55610839
+    },
+    "WT_TNF_R1": {
+      "detected_gene_ids": 20841,
+      "library_size": 53497228
+    },
+    "WT_TNF_R2": {
+      "detected_gene_ids": 20233,
+      "library_size": 50562637
+    },
+    "WT_TNF_R3": {
+      "detected_gene_ids": 20730,
+      "library_size": 51599194
+    },
+    "WT_control_R1": {
+      "detected_gene_ids": 20734,
+      "library_size": 54018620
+    },
+    "WT_control_R2": {
+      "detected_gene_ids": 20182,
+      "library_size": 50688202
+    },
+    "WT_control_R3": {
+      "detected_gene_ids": 20713,
+      "library_size": 54885401
+    }
+  },
+  "source": {
+    "columns": 34,
+    "filename": "Expression_Profile.GRCh38.gene(20260814-181921).xlsx",
+    "rows_including_header": 46428,
+    "sha256": "41cee68a4cd33f72268b46dc78fd0708dd62655814ae19a8a39fefd8aa5d5989",
+    "size_bytes": 8022936,
+    "worksheet": "Expression_Profile.GRCh38.gene"
+  },
+  "within_group_replicate_correlations": {
+    "TNFR1_KO1__IFNG": {
+      "maximum": 0.9862901994598596,
+      "median": 0.9856652191561249,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9845644750773095,
+      "pairs": [
+        {
+          "pearson_r": 0.9862901994598596,
+          "sample_a": "TNFR1_KO1_IFNG_R1",
+          "sample_b": "TNFR1_KO1_IFNG_R2"
+        },
+        {
+          "pearson_r": 0.9845644750773095,
+          "sample_a": "TNFR1_KO1_IFNG_R1",
+          "sample_b": "TNFR1_KO1_IFNG_R3"
+        },
+        {
+          "pearson_r": 0.9856652191561249,
+          "sample_a": "TNFR1_KO1_IFNG_R2",
+          "sample_b": "TNFR1_KO1_IFNG_R3"
+        }
+      ]
+    },
+    "TNFR1_KO1__TNF": {
+      "maximum": 0.9886568667609649,
+      "median": 0.9879650814221849,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9876256569360791,
+      "pairs": [
+        {
+          "pearson_r": 0.9886568667609649,
+          "sample_a": "TNFR1_KO1_TNF_R1",
+          "sample_b": "TNFR1_KO1_TNF_R2"
+        },
+        {
+          "pearson_r": 0.9879650814221849,
+          "sample_a": "TNFR1_KO1_TNF_R1",
+          "sample_b": "TNFR1_KO1_TNF_R3"
+        },
+        {
+          "pearson_r": 0.9876256569360791,
+          "sample_a": "TNFR1_KO1_TNF_R2",
+          "sample_b": "TNFR1_KO1_TNF_R3"
+        }
+      ]
+    },
+    "TNFR1_KO1__TNF_IFNG": {
+      "maximum": 0.9881852456182723,
+      "median": 0.9881849273165283,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9880499942826552,
+      "pairs": [
+        {
+          "pearson_r": 0.9881849273165283,
+          "sample_a": "TNFR1_KO1_TNF_IFNG_R1",
+          "sample_b": "TNFR1_KO1_TNF_IFNG_R2"
+        },
+        {
+          "pearson_r": 0.9880499942826552,
+          "sample_a": "TNFR1_KO1_TNF_IFNG_R1",
+          "sample_b": "TNFR1_KO1_TNF_IFNG_R3"
+        },
+        {
+          "pearson_r": 0.9881852456182723,
+          "sample_a": "TNFR1_KO1_TNF_IFNG_R2",
+          "sample_b": "TNFR1_KO1_TNF_IFNG_R3"
+        }
+      ]
+    },
+    "TNFR1_KO1__control": {
+      "maximum": 0.9887547060695893,
+      "median": 0.9879021895178035,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9876063419959848,
+      "pairs": [
+        {
+          "pearson_r": 0.9887547060695893,
+          "sample_a": "TNFR1_KO1_control_R1",
+          "sample_b": "TNFR1_KO1_control_R2"
+        },
+        {
+          "pearson_r": 0.9876063419959848,
+          "sample_a": "TNFR1_KO1_control_R1",
+          "sample_b": "TNFR1_KO1_control_R3"
+        },
+        {
+          "pearson_r": 0.9879021895178035,
+          "sample_a": "TNFR1_KO1_control_R2",
+          "sample_b": "TNFR1_KO1_control_R3"
+        }
+      ]
+    },
+    "WT__IFNG": {
+      "maximum": 0.9886229096774689,
+      "median": 0.9885360464476746,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9876894914180578,
+      "pairs": [
+        {
+          "pearson_r": 0.9876894914180578,
+          "sample_a": "WT_IFNG_R1",
+          "sample_b": "WT_IFNG_R2"
+        },
+        {
+          "pearson_r": 0.9886229096774689,
+          "sample_a": "WT_IFNG_R1",
+          "sample_b": "WT_IFNG_R3"
+        },
+        {
+          "pearson_r": 0.9885360464476746,
+          "sample_a": "WT_IFNG_R2",
+          "sample_b": "WT_IFNG_R3"
+        }
+      ]
+    },
+    "WT__TNF": {
+      "maximum": 0.9893001641859871,
+      "median": 0.9885683925134987,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9882937672285794,
+      "pairs": [
+        {
+          "pearson_r": 0.9882937672285794,
+          "sample_a": "WT_TNF_R1",
+          "sample_b": "WT_TNF_R2"
+        },
+        {
+          "pearson_r": 0.9893001641859871,
+          "sample_a": "WT_TNF_R1",
+          "sample_b": "WT_TNF_R3"
+        },
+        {
+          "pearson_r": 0.9885683925134987,
+          "sample_a": "WT_TNF_R2",
+          "sample_b": "WT_TNF_R3"
+        }
+      ]
+    },
+    "WT__TNF_IFNG": {
+      "maximum": 0.9878696334465483,
+      "median": 0.9870158830115701,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9868312102505572,
+      "pairs": [
+        {
+          "pearson_r": 0.9878696334465483,
+          "sample_a": "WT_TNF_IFNG_R1",
+          "sample_b": "WT_TNF_IFNG_R2"
+        },
+        {
+          "pearson_r": 0.9870158830115701,
+          "sample_a": "WT_TNF_IFNG_R1",
+          "sample_b": "WT_TNF_IFNG_R3"
+        },
+        {
+          "pearson_r": 0.9868312102505572,
+          "sample_a": "WT_TNF_IFNG_R2",
+          "sample_b": "WT_TNF_IFNG_R3"
+        }
+      ]
+    },
+    "WT__control": {
+      "maximum": 0.9895252486550993,
+      "median": 0.9890682855487217,
+      "metric": "Pearson correlation over log1p raw counts for all Gene_ID rows",
+      "minimum": 0.9886004276605599,
+      "pairs": [
+        {
+          "pearson_r": 0.9890682855487217,
+          "sample_a": "WT_control_R1",
+          "sample_b": "WT_control_R2"
+        },
+        {
+          "pearson_r": 0.9895252486550993,
+          "sample_a": "WT_control_R1",
+          "sample_b": "WT_control_R3"
+        },
+        {
+          "pearson_r": 0.9886004276605599,
+          "sample_a": "WT_control_R2",
+          "sample_b": "WT_control_R3"
+        }
+      ]
+    }
+  }
+}

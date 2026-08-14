@@ -1,0 +1,2 @@
+source_id	filename_as_received	canonical_archive_filename	file_role	creator	workbook_created_utc	worksheet	rows_including_header	columns	size_bytes	sha256	repository_policy
+project_bulk_rnaseq_counts	Expression_Profile.GRCh38.gene(20260814-181921).xlsx	Expression_Profile.GRCh38.gene.xlsx	Author-supplied project bulk RNA-seq count workbook	Macrogen	2025-04-07T09:14:59Z	Expression_Profile.GRCh38.gene	46428	34	8022936	41cee68a4cd33f72268b46dc78fd0708dd62655814ae19a8a39fefd8aa5d5989	Canonical compressed derivatives committed; source XLSX retained by authors

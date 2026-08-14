@@ -9,10 +9,10 @@ data or metadata.
 
 | Manuscript panel | Script and output | Input | Manuscript action |
 |---|---|---|---|
-| Figure 1B | `R/03_figure_1_B_C.R`; `figures/figure_1/Figure_1B_*_volcano.*` | Complete unfiltered cytokine-versus-untreated DESeq2 tables | **Do not replace yet.** The supplied files contain only FDR-significant rows and cannot support a conventional volcano plot. |
-| Figure 1C | `R/03_figure_1_B_C.R`; `figures/figure_1/Figure_1C_upregulated_overlap.*` | Version-controlled significant-gene table | Replace after the clean R run and verify the overlap counts against the current panel. |
-| Figure 2B | `R/04_figure_2_B_suppl_S2D.R`; `figures/figure_2/Figure_2B_*_T6_vs_WT_volcano.*` | Version-controlled matched T6-versus-WT tables | Replace after the clean R run. Use `T6` until the T6-to-KO clone key is confirmed. |
-| Supplementary Figure S2D | `R/04_figure_2_B_suppl_S2D.R`; `figures/figure_2/Supplementary_Figure_S2D_downregulated_overlap.*` | Same matched tables | Replace together with Figure 2B after alias confirmation. |
+| Figure 1B | `scripts/run_bulk_rnaseq_pydeseq2.py`, then `R/03_figure_1_B_C.R`; `figures/figure_1/Figure_1B_*_volcano.*` | Version-controlled count matrix, sample metadata and validated complete adapter under `data/experimental/bulk_rnaseq/derived/` | Replace with all three 600-dpi panels after the clean workflow artifact passes tabular and visual QA. Positive log2 fold change means higher expression after treatment. |
+| Figure 1C | Same workflow; `figures/figure_1/Figure_1C_upregulated_overlap.*` | Same complete regenerated adapters, thresholded only during plotting | Replace together with Figure 1B and verify the exported set/intersection counts. |
+| Figure 2B | `scripts/run_bulk_rnaseq_pydeseq2.py`, then `R/04_figure_2_B_suppl_S2D.R`; `figures/figure_2/Figure_2B_*_TNFR1_KO1_vs_WT_volcano.*` | Complete regenerated TNFR1-KO1-versus-WT adapters; T6 is author-confirmed as TNFR1-KO1 | Replace all three panels together. Positive log2 fold change means higher expression in TNFR1-KO1 within the indicated condition. |
+| Supplementary Figure S2D | Same workflow; `figures/figure_2/Supplementary_Figure_S2D_downregulated_overlap.*` | The combined adapter contains all four strata for universe/QC checks; the Venn analysis uses the TNF, IFNγ and TNF+IFNγ contrasts | Replace together with Figure 2B and verify the exported set/intersection counts. |
 | Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R`; `figures/Figure_4A_UMAP_clusters_annotated.png`, `Figure_4B_cluster_fraction_facet.png` | WT/KO1/KO2 targeted counts from CD3+ sheets | Replace both panels after a clean Seurat run. Cluster fractions describe computationally retained cells, not absolute live-cell phenotype frequencies. |
 | Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R`; `figures/Supplementary_Figure_S5A_UMAP_by_sample.png` | Same WT/KO inputs | Replace after the same clean Seurat run. |
 | Figure 5A | `R/05_figure_4_AB_suppl_S5A.R`; `figures/Figure_5A_TCR_UMAP_clusters.png`, `Figure_5A_TCR_cluster_composition.png` | TCR targeted counts from the CD3+ sheet, n=5,662 | Replace after a clean Seurat run. The six labels are independent of the tumor-co-culture C0-C9 labels. |
@@ -25,10 +25,13 @@ and the authors must review marker profiles against every manual label.
 Reappearance of cluster IDs 0-N is not sufficient because graph-cluster
 numbers can permute between runs.
 
-`R/03` and `R/04` reproduce plotted effects from author-generated DE result
-tables. They do not re-estimate DE models from raw counts. Full end-to-end
-reproduction additionally requires the count matrix, design/contrast code,
-filtering record and locked DE environment in the article-data archive.
+The original integer count matrix, sample manifest and count-to-DE code are
+version-controlled. `scripts/run_bulk_rnaseq_pydeseq2.py` generates three WT
+cytokine-versus-control contrasts, four within-condition
+TNFR1-KO1-versus-WT contrasts and, when requested, three separate formal
+genotype-by-treatment interaction contrasts. `R/03` and `R/04` accept only the
+complete regenerated adapters; the interaction results do not replace the
+within-condition Figure 2 contrasts.
 
 ## Clinical-context panels
 
@@ -53,7 +56,7 @@ nivolumab-only workflow.
 
 | Panel | Status | Required resolution |
 |---|---|---|
-| Supplementary Figure S1B | Not final | Supply the exact DepMap release name, Figshare DOI, download date, SHA-256 values and same-release model/expression files; otherwise remove S1B and its cross-cancer numerical claim. |
+| Supplementary Figure S1B | Not final | The supplied profile-level expression ZIP is structurally consistent with DepMap Public 25Q2 but lacks embedded release metadata. Supply same-release `Model.csv`, the official release/source URL, download date and SHA-256 values. A DOI is optional because 25Q2 was distributed directly through the DepMap portal. Otherwise remove S1B and its cross-cancer numerical claim. |
 | Supplementary Figure S3 | Not generated by this repository | Supply raw FCS files, compensation/gating workspace, live/dead gating and denominator, E:T ratio, timing, cytokine-exposure timing, replicate/donor map and exact WT-versus-KO contrasts. Replace `Delta MFI normalized fold change` with a defined recovered dual-positive-event metric. |
 
 The acute S3 assay supports the statement that no reduction was detected in

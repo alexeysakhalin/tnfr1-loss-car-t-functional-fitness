@@ -1,0 +1,145 @@
+name: Rebuild bulk RNA-seq figures
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/bulk-rnaseq.yml"
+      - "data/experimental/bulk_rnaseq/**"
+      - "requirements-bulk-rnaseq.in"
+      - "requirements-bulk-rnaseq.txt"
+      - "scripts/run_bulk_rnaseq_pydeseq2.py"
+      - "R/03_figure_1_B_C.R"
+      - "R/04_figure_2_B_suppl_S2D.R"
+      - "R/bulk_rnaseq_figure_helpers.R"
+
+permissions:
+  contents: read
+
+jobs:
+  differential-expression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12.13"
+          cache: pip
+          cache-dependency-path: requirements-bulk-rnaseq.txt
+      - name: Install the locked bulk RNA-seq environment
+        run: |
+          python -m pip install pip==25.0.1
+          python -m pip install --requirement requirements-bulk-rnaseq.txt
+      - name: Fit primary and interaction models
+        run: >-
+          python scripts/run_bulk_rnaseq_pydeseq2.py
+          --input-dir data/experimental/bulk_rnaseq
+          --output-dir results/bulk_rnaseq
+          --include-interaction
+          --n-cpus 2
+      - name: Verify complete result exports
+        run: |
+          python - <<'PY'
+          import gzip
+          import json
+          from pathlib import Path
+
+          import pandas as pd
+
+          root = Path("results/bulk_rnaseq")
+          manifest = pd.read_csv(root / "analysis_manifest.tsv", sep="\t")
+          if len(manifest) != 10 or manifest["analysis_id"].duplicated().any():
+              raise SystemExit("Expected ten unique primary/interaction analyses")
+          for filename in manifest["output_file"]:
+              path = root / filename
+              with gzip.open(path, "rt", encoding="utf-8") as handle:
+                  header = handle.readline().rstrip("\n").split("\t")
+                  rows = sum(1 for _ in handle)
+              if rows != 46_425 or "Gene_Symbol" not in header:
+                  raise SystemExit(f"Unexpected unfiltered result contract: {path}")
+          metadata = json.loads((root / "run_metadata.json").read_text())
+          if metadata["pydeseq2"] != "0.5.4" or not metadata["include_interaction"]:
+              raise SystemExit("Unexpected PyDESeq2 runtime metadata")
+          release = Path("data/experimental/bulk_rnaseq/derived")
+          release_pairs = {
+              root / "figure_inputs/figure_1b_1c_wt_cytokine_contrasts.unfiltered.tsv.gz":
+                  release / "figure_1b_1c_wt_cytokine_contrasts.unfiltered.tsv.gz",
+              root / "figure_inputs/figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz":
+                  release / "figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz",
+              root / "interaction_TNFR1_KO1_vs_WT_IFNG_vs_control.unfiltered.tsv.gz":
+                  release / "interaction_TNFR1_KO1_vs_WT_IFNG_vs_control.unfiltered.tsv.gz",
+              root / "interaction_TNFR1_KO1_vs_WT_TNF_vs_control.unfiltered.tsv.gz":
+                  release / "interaction_TNFR1_KO1_vs_WT_TNF_vs_control.unfiltered.tsv.gz",
+              root / "interaction_TNFR1_KO1_vs_WT_TNF_IFNG_vs_control.unfiltered.tsv.gz":
+                  release / "interaction_TNFR1_KO1_vs_WT_TNF_IFNG_vs_control.unfiltered.tsv.gz",
+              root / "analysis_manifest.tsv": release / "analysis_manifest.tsv",
+              root / "run_metadata.json": release / "run_metadata.json",
+              root / "environment.freeze.txt": release / "environment.freeze.txt",
+          }
+          for generated, committed in release_pairs.items():
+              if generated.read_bytes() != committed.read_bytes():
+                  raise SystemExit(
+                      f"Regenerated output differs from the validated release: {generated}"
+                  )
+          print("BULK_RNASEQ_RESULTS_OK")
+          PY
+      - name: Upload complete DE results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bulk-rnaseq-results
+          path: results/bulk_rnaseq/
+          if-no-files-found: error
+          retention-days: 14
+
+  manuscript-figures:
+    needs: differential-expression
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: bulk-rnaseq-results
+          path: results/bulk_rnaseq
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.4.3"
+      - name: Install figure dependencies
+        shell: Rscript {0}
+        run: |
+          options(repos = c(CRAN = "https://cloud.r-project.org"))
+          install.packages(c(
+            "data.table", "R.utils", "dplyr", "ggplot2", "ggrepel",
+            "VennDiagram", "renv"
+          ))
+      - name: Render Figure 1B-C, Figure 2B and Supplementary Figure S2D
+        run: |
+          Rscript R/03_figure_1_B_C.R
+          Rscript R/04_figure_2_B_suppl_S2D.R
+      - name: Record the R environment
+        shell: Rscript {0}
+        run: |
+          dir.create("results/release", recursive = TRUE, showWarnings = FALSE)
+          writeLines(capture.output(sessionInfo()), "results/release/sessionInfo_bulk_figures.txt")
+          renv::snapshot(
+            lockfile = "results/release/renv_bulk_figures.lock",
+            packages = c(
+              "data.table", "R.utils", "dplyr", "ggplot2", "ggrepel",
+              "VennDiagram", "renv"
+            ),
+            prompt = FALSE
+          )
+      - name: Upload manuscript-ready figure outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: bulk-rnaseq-manuscript-figures
+          path: |
+            figures/figure_1/
+            figures/figure_2/
+            results/figure_1/
+            results/figure_2/
+            results/release/sessionInfo_bulk_figures.txt
+            results/release/renv_bulk_figures.lock
+          if-no-files-found: error
+          retention-days: 14

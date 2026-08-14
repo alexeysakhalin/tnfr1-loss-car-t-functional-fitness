@@ -1,9 +1,12 @@
 # Supplementary Figure S1B: release-locked DepMap RIPK3/NLRP3 analysis.
 #
-# This script intentionally stops unless the exact DepMap release, DOI,
-# download date and SHA-256 checksums are provided. It retains one official
-# default expression entry per human tumor-derived cell-line model. The same
-# fixed cutoff (0.5 log2(TPM+1)) is used for statistics and plotted dividers.
+# This script intentionally stops unless the exact DepMap release, official
+# source URL, download date and SHA-256 checksums are provided. A release DOI
+# is recorded when one exists but is not required because recent public
+# releases are distributed directly through the DepMap portal. The analysis
+# retains one official default expression entry per human tumor-derived
+# cell-line model. The same fixed cutoff (0.5 log2(TPM+1)) is used for
+# statistics and plotted dividers.
 
 suppressPackageStartupMessages({
   library(data.table)
@@ -23,18 +26,25 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 metadata <- c(
   release = Sys.getenv("DEPMAP_RELEASE"),
-  release_doi = Sys.getenv("DEPMAP_RELEASE_DOI"),
+  release_url = Sys.getenv("DEPMAP_RELEASE_URL"),
   download_date = Sys.getenv("DEPMAP_DOWNLOAD_DATE"),
   expression_sha256 = Sys.getenv("DEPMAP_EXPRESSION_SHA256"),
   model_sha256 = Sys.getenv("DEPMAP_MODEL_SHA256")
 )
 if (any(!nzchar(metadata))) {
   stop(
-    "Set DEPMAP_RELEASE, DEPMAP_RELEASE_DOI, DEPMAP_DOWNLOAD_DATE, ",
+    "Set DEPMAP_RELEASE, DEPMAP_RELEASE_URL, DEPMAP_DOWNLOAD_DATE, ",
     "DEPMAP_EXPRESSION_SHA256 and DEPMAP_MODEL_SHA256 before running."
   )
 }
-if (!grepl("^10\\.[0-9]{4,9}/", metadata[["release_doi"]])) {
+if (!grepl(
+  "^https://([A-Za-z0-9-]+\\.)?depmap\\.org/",
+  metadata[["release_url"]], ignore.case = TRUE
+)) {
+  stop("DEPMAP_RELEASE_URL must be an official depmap.org HTTPS URL.")
+}
+release_doi <- Sys.getenv("DEPMAP_RELEASE_DOI")
+if (nzchar(release_doi) && !grepl("^10\\.[0-9]{4,9}/", release_doi)) {
   stop("DEPMAP_RELEASE_DOI is not DOI-shaped.")
 }
 if (!grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", metadata[["download_date"]])) {
@@ -61,11 +71,12 @@ if (length(setdiff(required_model, model_header))) {
        paste(setdiff(required_model, model_header), collapse = ", "))
 }
 default_candidates <- c(
-  "IsDefaultEntryForModel", "IsDefaultEntry", "isDefaultEntryForModel"
+  "IsDefaultEntryForModel", "IsDefaultEntry", "isDefaultEntryForModel",
+  "is_default_entry"
 )
 default_flag <- intersect(default_candidates, expr_header)[1]
 if (is.na(default_flag) || !"ModelID" %in% expr_header) {
-  stop("Expression file lacks ModelID or IsDefaultEntryForModel.")
+  stop("Expression file lacks ModelID or a recognized default-entry field.")
 }
 
 find_gene_column <- function(symbol) {
@@ -80,7 +91,7 @@ gene_columns <- setNames(
   c("RIPK3", "NLRP3")
 )
 
-eligible_models <- fread(
+model_rows <- fread(
   model_file, select = required_model, showProgress = FALSE
 ) |>
   as_tibble() |>
@@ -89,16 +100,23 @@ eligible_models <- fread(
     ModelType = trimws(as.character(.data$ModelType)),
     TissueOrigin = trimws(as.character(.data$TissueOrigin)),
     OncotreePrimaryDisease = trimws(as.character(.data$OncotreePrimaryDisease))
-  ) |>
+  )
+if (any(is.na(model_rows$ModelID)) || any(model_rows$ModelID == "") ||
+    anyDuplicated(model_rows$ModelID)) {
+  stop("Model.csv must contain one non-empty, unique row per ModelID.")
+}
+
+eligible_models <- model_rows |>
   filter(
     toupper(.data$ModelType) == "CELL LINE",
     toupper(.data$TissueOrigin) == "HUMAN",
-    !is.na(.data$OncotreePrimaryDisease), .data$OncotreePrimaryDisease != ""
-  ) |>
-  distinct(.data$ModelID, .keep_all = TRUE)
+    !is.na(.data$OncotreePrimaryDisease),
+    .data$OncotreePrimaryDisease != "",
+    toupper(.data$OncotreePrimaryDisease) != "NON-CANCEROUS"
+  )
 if (!nrow(eligible_models)) stop("No eligible human tumor cell-line models found.")
 
-expression <- fread(
+expression_rows <- fread(
   expr_file,
   select = c("ModelID", default_flag, unname(gene_columns)),
   showProgress = FALSE
@@ -109,17 +127,49 @@ expression <- fread(
     default_entry = toupper(trimws(as.character(.data[[default_flag]]))),
     RIPK3 = suppressWarnings(as.numeric(.data[[gene_columns[["RIPK3"]]]])),
     NLRP3 = suppressWarnings(as.numeric(.data[[gene_columns[["NLRP3"]]]]))
-  ) |>
+  )
+expression <- expression_rows |>
   filter(.data$default_entry %in% c("YES", "TRUE", "1")) |>
   select(-default_entry)
 if (anyDuplicated(expression$ModelID)) {
   stop("Multiple default expression entries remain for at least one ModelID.")
+}
+missing_model_ids <- setdiff(expression$ModelID, model_rows$ModelID)
+if (length(missing_model_ids) > 0L) {
+  stop(
+    "Model.csv is missing ", length(missing_model_ids),
+    " default-expression ModelID values; first: ", missing_model_ids[[1]]
+  )
 }
 
 analysis <- eligible_models |>
   inner_join(expression, by = "ModelID") |>
   filter(is.finite(.data$RIPK3), is.finite(.data$NLRP3))
 if (nrow(analysis) < 100L) stop("Unexpectedly few eligible DepMap models.")
+
+qc_counts <- tibble(
+  stage = c(
+    "expression_profiles_source", "expression_profiles_default",
+    "models_source", "human_cell_line_models",
+    "non_cancerous_models_excluded", "final_complete_models"
+  ),
+  n = c(
+    nrow(expression_rows), nrow(expression), nrow(model_rows),
+    sum(
+      toupper(model_rows$ModelType) == "CELL LINE" &
+        toupper(model_rows$TissueOrigin) == "HUMAN",
+      na.rm = TRUE
+    ),
+    sum(
+      toupper(model_rows$ModelType) == "CELL LINE" &
+        toupper(model_rows$TissueOrigin) == "HUMAN" &
+        toupper(model_rows$OncotreePrimaryDisease) == "NON-CANCEROUS",
+      na.rm = TRUE
+    ),
+    nrow(analysis)
+  )
+)
+write_csv(qc_counts, file.path(out_dir, "Supplementary_Figure_S1B_input_qc.csv"))
 
 cutoff <- 0.5
 analysis <- analysis |>
@@ -189,14 +239,15 @@ ggsave(file.path(out_dir, "Supplementary_Figure_S1B_scatter.tiff"),
 
 provenance <- list(
   depmap_release = metadata[["release"]],
-  depmap_release_doi = metadata[["release_doi"]],
+  depmap_release_url = metadata[["release_url"]],
+  depmap_release_doi = if (nzchar(release_doi)) release_doi else NA_character_,
   download_date = metadata[["download_date"]],
   expression_sha256 = observed_expression_sha256,
   model_sha256 = observed_model_sha256,
   default_entry_field = default_flag,
   model_filters = list(
     ModelType = "Cell Line", TissueOrigin = "Human",
-    OncotreePrimaryDisease = "non-empty"
+    OncotreePrimaryDisease = "non-empty and not Non-Cancerous"
   ),
   n_models = nrow(analysis),
   cutoff_log2_tpm_plus_1 = cutoff

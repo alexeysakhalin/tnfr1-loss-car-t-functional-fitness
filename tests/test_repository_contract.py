@@ -66,6 +66,45 @@ class RepositoryContractTests(unittest.TestCase):
                 {"local_only", "metadata_only", "mapping_resource_committed"},
             )
 
+    def test_author_confirmed_experimental_aliases(self) -> None:
+        path = (
+            ROOT / "data" / "experimental" / "experimental_sample_aliases.tsv"
+        )
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle, delimiter="\t"))
+        self.assertEqual(
+            rows,
+            [
+                {
+                    "source_identifier": "T6",
+                    "manuscript_identifier": "TNFR1-KO1",
+                    "confirmation_basis": "author confirmation",
+                    "confirmation_date": "2026-08-14",
+                }
+            ],
+        )
+        figure_script = (ROOT / "R" / "04_figure_2_B_suppl_S2D.R").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("TNFR1-KO1 versus WT", figure_script)
+        self.assertNotIn("Use `T6` until", (ROOT / "docs" / "FIGURE_MAP.md").read_text(
+            encoding="utf-8"
+        ))
+
+    def test_depmap_release_contract_accepts_25q2_schema(self) -> None:
+        script = (ROOT / "R" / "11_supplementary_1B.R").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"is_default_entry"', script)
+        self.assertIn('Sys.getenv("DEPMAP_RELEASE_URL")', script)
+        self.assertIn('Sys.getenv("DEPMAP_RELEASE_DOI")', script)
+        self.assertIn('toupper(.data$OncotreePrimaryDisease) != "NON-CANCEROUS"', script)
+        self.assertIn("missing_model_ids <- setdiff", script)
+        self.assertIn("Supplementary_Figure_S1B_input_qc.csv", script)
+        self.assertNotIn(
+            'release_doi = Sys.getenv("DEPMAP_RELEASE_DOI")', script
+        )
+
     def test_signature_resource_has_ten_fixed_twenty_gene_sets(self) -> None:
         signature_path = ROOT / "resources" / "CAR_T_state_signatures.csv"
         self.assertEqual(
