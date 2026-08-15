@@ -147,13 +147,6 @@ restricted to the 181 nivolumab-treated RNA samples (CM-009: 16; CM-010: 45;
 CM-025: 120). Only aggregate coefficients, confidence intervals, multiplicity
 adjustments and QC counts are version-controlled.
 
-## Why SQLite is not used
-
-The analysis consumes four fixed cohort matrices and a small number of explicit
-transformations. Two explicit compressed TSV contracts plus a source manifest
-make every transformation inspectable without a database schema or hidden
-import state. Full matrices remain in their publisher formats; selected local
-tables are regenerated when gene sets or source versions change.
 
 ## DepMap Supplementary Figure S1B
 
@@ -177,3 +170,4 @@ raw files. The expression matrix is fixed as DepMap Public 25Q2; the
 unverified. The current contract therefore does not support calling the two
 supplied files a same-release 25Q2 pair. The complete contract, fixed counts
 and wording restrictions are documented in `docs/DEPMAP_S1B.md`.
+
