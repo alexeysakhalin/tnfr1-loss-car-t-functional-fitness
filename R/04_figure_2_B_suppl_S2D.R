@@ -49,55 +49,58 @@ if (!identical(names(condition_display), expected_conditions)) {
   stop("Internal condition-display mapping is incomplete.")
 }
 
-label_genes <- c(
-  "CASP3", "CASP7", "CASP8", "CASP9", "BAX", "BAK1", "BCL2", "FAS",
-  "APAF1", "GSDMD", "GSDME", "CASP1", "CASP4", "CASP5", "AIM2",
-  "NLRP3", "RIPK1", "RIPK3", "MLKL", "ICAM1", "IRF1"
+figure_2b_label_genes <- c(
+  "ICAM1", "MLKL", "GSDME", "IRF1"
+)
+publication_condition_order <- c("TNF_IFNG", "IFNG", "TNF")
+ko1_prepared <- setNames(
+  lapply(publication_condition_order, function(condition) {
+    condition_rows <- ko1_vs_wt[
+      ko1_vs_wt$condition == condition,
+      ,
+      drop = FALSE
+    ]
+    prepare_bulk_volcano_rows(condition_rows, figure_2b_label_genes)
+  }),
+  publication_condition_order
+)
+ko1_common_x_limits <- symmetric_bulk_volcano_x_limits(ko1_prepared)
+write_bulk_volcano_output_contract(
+  prepared_by_condition = ko1_prepared,
+  condition_order = publication_condition_order,
+  label_genes = figure_2b_label_genes,
+  common_x_limits = ko1_common_x_limits,
+  path = file.path(result_dir, "Figure_2B_volcano_output_contract.tsv")
 )
 
-make_ko1_volcano <- function(condition, panel_title, output_stem) {
-  condition_rows <- ko1_vs_wt[ko1_vs_wt$condition == condition, , drop = FALSE]
-  genes <- plottable_bulk_rows(condition_rows)
-  if (!nrow(genes)) {
-    stop("No modelled genes with finite adjusted p-values remain for the ",
-         condition, " volcano plot.")
+make_ko1_volcano_plot <- function(condition, panel_title, compact = FALSE) {
+  prepared <- ko1_prepared[[condition]]
+  if (is.null(prepared)) {
+    stop("No prepared volcano data for condition ", condition, ".")
   }
-
-  genes$adjusted_p_value_plot <- pmax(genes$adjusted_p_value, 1e-300)
-  genes$minus_log10_adjusted_p <- -log10(genes$adjusted_p_value_plot)
-  genes$status <- factor(
-    ifelse(
-      genes$base_mean >= 30 & genes$effect > 1 &
-        genes$adjusted_p_value < 0.05,
-      "Upregulated",
-      ifelse(
-        genes$base_mean >= 30 & genes$effect < -1 &
-          genes$adjusted_p_value < 0.05,
-        "Downregulated",
-        "Not significant"
-      )
-    ),
-    levels = c("Upregulated", "Downregulated", "Not significant")
-  )
-
-  label_data <- genes[
-    genes$base_mean >= 30 & genes$gene_symbol_key %in% label_genes,
-    ,
-    drop = FALSE
-  ]
-  y_limit <- max(20, ceiling(max(genes$minus_log10_adjusted_p, na.rm = TRUE)) + 2)
+  genes <- prepared$genes
+  label_data <- prepared$labels
+  base_size <- if (compact) 8.5 else 14
+  label_size <- if (compact) BULK_VOLCANO_COMPACT_LABEL_SIZE_MM else 4
+  point_size <- if (compact) 0.70 else 1.8
+  x_label <- if (compact) NULL else {
+    "Log2 fold change (TNFR1-KO1 vs WT)"
+  }
+  y_label <- if (compact) NULL else {
+    "-Log10 adjusted P (capped at 300)"
+  }
 
   plot <- ggplot2::ggplot(
     genes,
     ggplot2::aes(x = effect, y = minus_log10_adjusted_p)
   ) +
-    ggplot2::geom_point(ggplot2::aes(color = status), size = 1.8, alpha = 0.80) +
+    ggplot2::geom_point(
+      ggplot2::aes(color = status),
+      size = point_size,
+      alpha = 0.80
+    ) +
     ggplot2::scale_color_manual(
-      values = c(
-        "Upregulated" = "#E64B35",
-        "Downregulated" = "#3182BD",
-        "Not significant" = "grey70"
-      ),
+      values = BULK_VOLCANO_STATUS_COLORS,
       drop = FALSE,
       name = "Status"
     ) +
@@ -107,47 +110,89 @@ make_ko1_volcano <- function(condition, panel_title, output_stem) {
     ggplot2::geom_hline(
       yintercept = -log10(0.05), linetype = "dashed", color = "black"
     ) +
-    ggplot2::coord_cartesian(xlim = c(-15, 15), ylim = c(0, y_limit), clip = "on") +
-    ggplot2::theme_minimal(base_size = 14) +
+    ggplot2::scale_y_continuous(
+      breaks = c(0, 50, 100, 150, 200, 250, 300),
+      expand = ggplot2::expansion(mult = c(0, 0.01))
+    ) +
+    ggplot2::coord_cartesian(
+      xlim = ko1_common_x_limits,
+      ylim = c(0, BULK_VOLCANO_Y_CAP + 5),
+      clip = "off"
+    ) +
+    ggplot2::theme_minimal(base_size = base_size) +
     ggplot2::labs(
       title = panel_title,
-      x = "Log2 fold change (TNFR1-KO1 vs WT)",
-      y = "-Log10 adjusted p-value"
+      x = x_label,
+      y = y_label
     ) +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5)) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        hjust = 0.5,
+        size = if (compact) 9 else ggplot2::rel(1.2),
+        face = if (compact) "bold" else "plain"
+      ),
+      axis.text = ggplot2::element_text(size = if (compact) 8 else ggplot2::rel(0.8)),
+      axis.title = ggplot2::element_text(size = if (compact) 8.5 else ggplot2::rel(1)),
+      legend.position = if (compact) "none" else "right",
+      plot.margin = if (compact) {
+        grid::unit(c(4, 3, 2, 2), "pt")
+      } else {
+        ggplot2::margin()
+      }
+    ) +
     ggrepel::geom_label_repel(
       data = label_data,
       ggplot2::aes(label = gene_symbol),
       color = "black",
-      size = 4,
-      box.padding = 0.35,
-      point.padding = 0.25,
-      label.padding = grid::unit(0.15, "lines"),
+      size = label_size,
+      box.padding = if (compact) 0.15 else 0.35,
+      point.padding = if (compact) 0.10 else 0.25,
+      label.padding = grid::unit(if (compact) 0.08 else 0.15, "lines"),
       label.size = 0,
       fill = scales::alpha("white", 0.9),
       segment.color = "black",
-      segment.size = 0.3,
+      segment.size = if (compact) 0.18 else 0.3,
       min.segment.length = 0,
       max.overlaps = Inf,
+      max.time = 2,
       seed = 42
     )
+  plot
+}
 
+ko1_individual_plots <- list(
+  TNF_IFNG = make_ko1_volcano_plot(
+    "TNF_IFNG",
+    expression("TNF + IFN" * gamma)
+  ),
+  IFNG = make_ko1_volcano_plot("IFNG", expression("IFN" * gamma)),
+  TNF = make_ko1_volcano_plot("TNF", "TNF")
+)
+ko1_individual_stems <- c(
+  TNF_IFNG = "Figure_2B_TNF_IFNg",
+  IFNG = "Figure_2B_IFNg",
+  TNF = "Figure_2B_TNF"
+)
+for (condition in publication_condition_order) {
   save_figure_pair(
-    plot,
-    file.path(figure_dir, output_stem),
+    ko1_individual_plots[[condition]],
+    file.path(figure_dir, ko1_individual_stems[[condition]]),
     width = 8,
     height = 6
   )
-  invisible(plot)
 }
 
-make_ko1_volcano(
-  "TNF_IFNG",
-  expression("TNF + IFN" * gamma),
-  "Figure_2B_TNF_IFNg"
+ko1_triptych_plots <- list(
+  make_ko1_volcano_plot("TNF_IFNG", expression("TNF + IFN" * gamma), compact = TRUE),
+  make_ko1_volcano_plot("IFNG", expression("IFN" * gamma), compact = TRUE),
+  make_ko1_volcano_plot("TNF", "TNF", compact = TRUE)
 )
-make_ko1_volcano("TNF", "TNF", "Figure_2B_TNF")
-make_ko1_volcano("IFNG", expression("IFN" * gamma), "Figure_2B_IFNg")
+save_bulk_volcano_triptych(
+  plots = ko1_triptych_plots,
+  stem = file.path(figure_dir, "Figure_2B_triptych"),
+  shared_x_label = "Log2 fold change (TNFR1-KO1 vs WT)",
+  shared_y_label = "-Log10 adjusted P (capped at 300)"
+)
 
 # Supplementary Figure S2D is restricted to the three cytokine-treated strata.
 figure_conditions <- c("TNF", "IFNG", "TNF_IFNG")

@@ -1,0 +1,7 @@
+metric,n,denominator,percent,cutoff_log2_tpm_plus_1
+RIPK3 below threshold,1003,1591,63.0,0.5
+NLRP3 below threshold,1172,1591,73.7,0.5
+Both below threshold,749,1591,47.1,0.5
+RIPK3 below threshold only,254,1591,16.0,0.5
+NLRP3 below threshold only,423,1591,26.6,0.5
+Neither below threshold,165,1591,10.4,0.5

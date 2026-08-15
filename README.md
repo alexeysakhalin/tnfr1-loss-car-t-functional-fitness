@@ -30,10 +30,12 @@ patients.
 | `reference_results/` | Aggregate validation results without sample identifiers |
 | `data/source_manifest.tsv` | Source URL, DOI/accession, licence, expected filename, size and SHA-256 |
 | `data/experimental/` | Non-identifying experimental analysis tables and QC manifest |
+| `data/analysis/depmap_s1b_*` | Compact DepMap S1B derivative, QC and source provenance |
+| `docs/DEPMAP_S1B.md` | Checksum-pinned expression/metadata contract for Supplementary Figure S1B |
 | `tests/` | Repository-contract and numerical-regression tests |
 
-Sample-level clinical and expression data are not version-controlled. Source
-files and locally generated sample-level tables are excluded by `.gitignore`.
+Patient-level clinical and expression data are not version-controlled. Source
+files and locally generated patient-level tables are excluded by `.gitignore`.
 This avoids redistributing the Braun CheckMate supplement, which does not carry
 an open redistribution licence, and keeps one consistent policy across all
 four cohorts.
@@ -55,9 +57,12 @@ python -m pip install --upgrade pip
 python -m pip install --requirement requirements.txt
 ```
 
-The final article release must additionally include the `renv.lock` and
-`sessionInfo()` produced by the clean R/Seurat run. Package versions are not
-guessed before that run is completed.
+The committed `renv.lock` fixes R 4.4.3 and the complete package dependency
+closure used to render the bulk RNA-seq panels. It was captured from a
+successful clean workflow run and is restored prospectively before rendering;
+the workflow does not install the latest available packages and then describe
+them after the fact. The lock will be expanded only after the separate clean
+R/Seurat and clinical-panel release runs have been accepted.
 
 The bulk RNA-seq model is isolated in a separately pinned Python environment:
 
@@ -86,8 +91,8 @@ the symbol-level models are fitted. Source and canonical-table checksums are
 recorded under [`data/experimental/bulk_rnaseq/`](data/experimental/bulk_rnaseq/).
 
 Re-estimate all seven primary contrasts and the three prespecified
-genotype-by-treatment interaction contrasts, then generate the experimental
-bulk-transcriptomic panels in manuscript order:
+genotype-by-treatment interaction contrasts, then generate the validated bulk
+RNA-seq panels:
 
 ```bash
 python scripts/run_bulk_rnaseq_pydeseq2.py \
@@ -95,9 +100,7 @@ python scripts/run_bulk_rnaseq_pydeseq2.py \
   --output-dir results/bulk_rnaseq \
   --include-interaction \
   --n-cpus 2
-Rscript R/03_figure_1_B_C.R
-Rscript R/04_figure_2_B_suppl_S2D.R
-Rscript R/05_figure_4_AB_suppl_S5A.R
+Rscript R/render_bulk_rnaseq_figures.R
 ```
 
 PyDESeq2 v0.5.4 fits each primary contrast as a separate six-sample model:
@@ -122,9 +125,18 @@ available in the comparison report; the displayed volcano-label genes have an
 additional absolute log2-fold-change reproducibility bound of `0.001`.
 
 The `Rebuild bulk RNA-seq figures` GitHub Actions workflow performs the pinned
-count-to-DE run, checks all complete result exports, renders 600-dpi PNG/TIFF
-panels with R 4.4.3 and stores both result and figure artifacts together with
-the comparison report and runtime provenance.
+count-to-DE run, checks all complete result exports, restores `renv.lock`, and
+renders 600-dpi PNG/TIFF panels with R 4.4.3. Both R scripts run in one process,
+so the archived `sessionInfo()` records the namespaces that actually rendered
+the panels. The manuscript-ready outputs are `Figure_1B_triptych.{png,tiff}`
+and `Figure_2B_triptych.{png,tiff}`; the three single-condition panels remain
+in the same artifact for audit. The triptychs use a data-derived common x
+range, cap displayed adjusted-P evidence at 300 on the -log10 scale with that
+cap stated on the axis, and retain only the prespecified result-relevant gene
+labels. The workflow verifies numeric display contracts, dimensions, 600-dpi
+metadata and TIFF LZW compression. The artifact also contains a byte-identical
+copy of the committed lock, its SHA-256 checksum, the comparison report and
+runtime provenance.
 
 The targeted single-cell inputs use the `CD3+ cells` sheets: WT, 3,743 cells;
 KO1, 2,475; KO2, 1,831; and the repeated-stimulation dataset, 5,662. These are
@@ -193,17 +205,32 @@ BH-adjusted Cox *p*=0.166 across ten signatures. The descriptive log-rank
 association was detected. These results do not support a predictive biomarker
 claim.
 
-## Release-locked analyses
+## DepMap analysis and release-provenance checkpoint
 
-Supplementary Figure S1B is intentionally release-locked. The supplied
-expression archive has the profile-level `is_default_entry` schema associated
-with DepMap Public 25Q2, but the archive itself does not identify its release.
-The analysis therefore still requires the same-release `Model.csv`, the
-official release/source URL, download date, checksums and one-default-profile-
-per-human-cell-line filtering. A release DOI is recorded when available but is
-not mandatory because current DepMap releases are distributed directly from
-the portal rather than Figshare. The repository does not retain the earlier
-unverified DepMap percentages.
+Supplementary Figure S1B joins one default expression profile per `ModelID`
+from a checksum-pinned DepMap matrix to checksum-pinned `Model.csv`. It retains
+records annotated as `ModelType == "Cell Line"` with a non-missing
+`OncotreePrimaryDisease` other than `"Non-Cancerous"`; `TissueOrigin` is empty
+in the supplied metadata and is not used. This yields 1,591 eligible models.
+At the prespecified threshold of <0.5 log2(TPM+1), RIPK3 is below threshold in
+1,003/1,591 (63.0%), NLRP3 in 1,172/1,591 (73.7%) and both in 749/1,591
+(47.1%). These are source-pair frequencies, not cancer prevalence or evidence
+of cell-death pathway competence.
+
+The complete sources remain local-only. A deterministic preparation script
+validates their sizes, digests, schemas, join and population filters and writes
+a tracked 47.5-kB `TSV.gz`, QC, source-provenance and statistics contract.
+`R/11_supplementary_1B.R` therefore renders the single manuscript panel in a
+clean clone without the raw files and revalidates artifact sizes, flags,
+quadrants and counts; repository tests pin every tracked SHA-256. The expression
+matrix is fixed as DepMap Public 25Q2. The release identity of the supplied
+`Model.csv` remains unverified, although its checksum is independently
+reproduced by a copy labelled 25Q3. Machine-readable provenance fixes the
+metadata and release-pair status as unverified, so the panel cannot be rendered
+with an unsupported same-release claim. Full source placement, run instructions,
+wording and interpretation limits are recorded in
+[`docs/DEPMAP_S1B.md`](docs/DEPMAP_S1B.md). No release-specific Figshare DOI
+should be invented for releases distributed through the portal.
 
 Supplementary Figure S3 is not generated by the transcriptomic workflow. It
 requires raw FCS files, the compensation/gating record, a defined live-cell

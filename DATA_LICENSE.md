@@ -1,6 +1,6 @@
 # Data and figure licensing
 
-Author-generated processed tables under `data/experimental/`, aggregate
+Author-generated processed tables under `data/experimental/`, the aggregate
 CheckMate outputs under `data/analysis/`, aggregate results under
 `reference_results/`, gene-set definitions under `resources/` and
 author-generated reference figures are licensed under the Creative Commons
@@ -17,6 +17,15 @@ terms. Their URLs, accessions, licences and redistribution decisions are listed
 in `data/source_manifest.tsv` and `data/README.md`. In particular, the Braun
 CheckMate source workbook and all sample-level derivatives are not distributed
 by this repository.
+
+The complete DepMap expression ZIP and source `Model.csv` used for
+Supplementary Figure S1B are also not distributed. They remain available from
+the DepMap portal under the source terms recorded in
+`data/source_manifest.tsv`. The repository distributes only the compact
+model-level S1B derivative needed to render the panel, together with source
+metadata, exact checksums, preparation code and QC. Reuse of that derivative
+and the accompanying statistics must retain DepMap attribution and remains
+subject to the source terms recorded in the manifest.
 
 Repository source code is licensed separately under the MIT License in
 `LICENSE`.

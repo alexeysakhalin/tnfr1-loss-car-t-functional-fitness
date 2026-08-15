@@ -206,6 +206,13 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         self.assertIn("lfc_se must be positive", helper)
         self.assertIn("plottable_bulk_rows <- function(adapter)", helper)
         self.assertIn("plottable_modelled_symbols = nrow(plottable)", helper)
+        self.assertIn("BULK_VOLCANO_P_VALUE_FLOOR <- 1e-300", helper)
+        self.assertIn("BULK_VOLCANO_Y_CAP <- 300", helper)
+        self.assertIn("symmetric_bulk_volcano_x_limits <- function", helper)
+        self.assertIn("write_bulk_volcano_output_contract <- function", helper)
+        self.assertIn("save_bulk_volcano_triptych <- function", helper)
+        self.assertIn('width = 6.5, height = 3, dpi = 600', helper)
+        self.assertIn('compression = "lzw"', helper)
 
         figure_1 = (ROOT / "R" / "03_figure_1_B_C.R").read_text(
             encoding="utf-8"
@@ -223,8 +230,26 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         self.assertIn('figure_dir <- file.path("figures", "figure_1")', figure_1)
         self.assertIn('result_dir <- file.path("results", "figure_1")', figure_1)
         self.assertIn("Figure_1C_upregulated_overlap", figure_1)
-        self.assertIn("genes <- plottable_bulk_rows(condition_rows)", figure_1)
-        self.assertIn("genes$base_mean >= 30 & genes$effect > 1", figure_1)
+        self.assertIn(
+            'publication_condition_order <- c("TNF_IFNG", "IFNG", "TNF")',
+            figure_1,
+        )
+        self.assertIn("Figure_1B_triptych", figure_1)
+        self.assertIn("Figure_1B_volcano_output_contract.tsv", figure_1)
+        for gene in (
+            "ICAM1",
+            "IRF1",
+            "AIM2",
+            "CASP1",
+            "CASP4",
+            "MLKL",
+            "BAK1",
+            "CASP7",
+            "FAS",
+            "CASP8",
+        ):
+            self.assertIn(f'"{gene}"', figure_1)
+        self.assertNotIn('"CASP5"', figure_1)
         self.assertIn(
             "figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz",
             figure_2,
@@ -234,8 +259,16 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         self.assertIn('figure_dir <- file.path("figures", "figure_2")', figure_2)
         self.assertIn('result_dir <- file.path("results", "figure_2")', figure_2)
         self.assertIn("Supplementary_Figure_S2D_downregulated_overlap", figure_2)
-        self.assertIn("genes <- plottable_bulk_rows(condition_rows)", figure_2)
-        self.assertIn("genes$base_mean >= 30 & genes$effect < -1", figure_2)
+        self.assertIn(
+            'publication_condition_order <- c("TNF_IFNG", "IFNG", "TNF")',
+            figure_2,
+        )
+        self.assertIn("Figure_2B_triptych", figure_2)
+        self.assertIn("Figure_2B_volcano_output_contract.tsv", figure_2)
+        self.assertIn("figure_2b_label_genes <- c(", figure_2)
+        for gene in ("ICAM1", "MLKL", "GSDME", "IRF1"):
+            self.assertIn(f'"{gene}"', figure_2)
+        self.assertNotIn('"CASP5"', figure_2)
         self.assertIn(
             'expected_conditions <- c("control", "IFNG", "TNF", "TNF_IFNG")',
             figure_2,
@@ -247,6 +280,80 @@ class BulkRnaSeqContractTests(unittest.TestCase):
             self.assertNotIn("Gene_ID", source)
             self.assertNotIn("writexl", source)
             self.assertNotIn("write_xlsx", source)
+
+        verifier = (
+            ROOT / "scripts" / "verify_bulk_figure_outputs.py"
+        ).read_text(encoding="utf-8")
+        ast.parse(verifier)
+        self.assertIn("PUBLICATION_CONDITION_ORDER", verifier)
+        self.assertIn("points_at_displayed_y_cap", verifier)
+        self.assertIn("TIFF compression is not LZW", verifier)
+
+    def test_publication_volcano_numeric_contract(self) -> None:
+        path = ROOT / "scripts" / "verify_bulk_figure_outputs.py"
+        module_name = "bulk_figure_output_verifier_for_test"
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        previous = sys.modules.get(module_name)
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+            figure_1, figure_2 = module.figure_specs(ROOT)
+            figure_1_rows = module.expected_contract_rows(figure_1)
+            figure_2_rows = module.expected_contract_rows(figure_2)
+        finally:
+            if previous is None:
+                sys.modules.pop(module_name, None)
+            else:
+                sys.modules[module_name] = previous
+
+        self.assertEqual(
+            [row["condition"] for row in figure_1_rows],
+            ["TNF_IFNG", "IFNG", "TNF"],
+        )
+        self.assertEqual(
+            [row["plottable_modelled_symbols"] for row in figure_1_rows],
+            [20_189, 19_827, 18_555],
+        )
+        self.assertEqual(
+            [row["points_at_displayed_y_cap"] for row in figure_1_rows],
+            [285, 96, 23],
+        )
+        self.assertTrue(
+            all(
+                (row["common_x_min"], row["common_x_max"]) == (-19, 19)
+                for row in figure_1_rows
+            )
+        )
+        self.assertEqual(
+            [row["plotted_label_count"] for row in figure_1_rows],
+            [10, 10, 9],
+        )
+
+        self.assertEqual(
+            [row["condition"] for row in figure_2_rows],
+            ["TNF_IFNG", "IFNG", "TNF"],
+        )
+        self.assertEqual(
+            [row["plottable_modelled_symbols"] for row in figure_2_rows],
+            [18_661, 19_858, 17_743],
+        )
+        self.assertEqual(
+            [row["points_at_displayed_y_cap"] for row in figure_2_rows],
+            [32, 7, 37],
+        )
+        self.assertTrue(
+            all(
+                (row["common_x_min"], row["common_x_max"]) == (-12, 12)
+                for row in figure_2_rows
+            )
+        )
+        self.assertEqual(
+            [row["plotted_label_count"] for row in figure_2_rows],
+            [4, 4, 4],
+        )
 
     def test_analysis_input_loading_and_factor_levels(self) -> None:
         package = types.ModuleType("pydeseq2")

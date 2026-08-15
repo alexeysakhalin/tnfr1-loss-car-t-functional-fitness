@@ -35,6 +35,9 @@ class RepositoryContractTests(unittest.TestCase):
             "data/analysis/checkmate_c6_global_gene_models.tsv.gz",
             "data/analysis/checkmate_c6_group_balance.tsv",
             "data/analysis/checkmate_c6_aggregate_qc.json",
+            "data/analysis/depmap_s1b_eligible_models.tsv.gz",
+            "data/analysis/depmap_s1b_preparation_qc.json",
+            "data/analysis/depmap_s1b_source_provenance.json",
         }
         self.assertFalse(
             [
@@ -91,19 +94,215 @@ class RepositoryContractTests(unittest.TestCase):
             encoding="utf-8"
         ))
 
-    def test_depmap_release_contract_accepts_25q2_schema(self) -> None:
-        script = (ROOT / "R" / "11_supplementary_1B.R").read_text(
+    def test_depmap_expression_metadata_contract_is_checksum_pinned(self) -> None:
+        render_script = (ROOT / "R" / "11_supplementary_1B.R").read_text(
             encoding="utf-8"
         )
-        self.assertIn('"is_default_entry"', script)
-        self.assertIn('Sys.getenv("DEPMAP_RELEASE_URL")', script)
-        self.assertIn('Sys.getenv("DEPMAP_RELEASE_DOI")', script)
-        self.assertIn('toupper(.data$OncotreePrimaryDisease) != "NON-CANCEROUS"', script)
-        self.assertIn("missing_model_ids <- setdiff", script)
-        self.assertIn("Supplementary_Figure_S1B_input_qc.csv", script)
-        self.assertNotIn(
-            'release_doi = Sys.getenv("DEPMAP_RELEASE_DOI")', script
+        self.assertIn("depmap_s1b_eligible_models.tsv.gz", render_script)
+        self.assertIn("depmap_s1b_preparation_qc.json", render_script)
+        self.assertIn("depmap_s1b_source_provenance.json", render_script)
+        self.assertIn("depmap_s1b_statistics.csv", render_script)
+        self.assertNotIn("DEPMAP_EXPRESSION_RELEASE", render_script)
+        self.assertNotIn("DEPMAP_MODEL_RELEASE", render_script)
+        self.assertIn('release_pair_status <- "unverified"', render_script)
+        self.assertIn('expression_release <- "DepMap Public 25Q2"', render_script)
+        self.assertIn('model_release_identity_status <- "unverified"', render_script)
+        self.assertIn('"tissue_origin_filter_applied"', render_script)
+        self.assertIn("library(data.table)", render_script)
+        self.assertIn("library(ggplot2)", render_script)
+        for package in ("dplyr", "readr", "tidyr", "digest", "jsonlite"):
+            self.assertNotIn(f"library({package})", render_script)
+        self.assertIn("Supplementary_Figure_S1B.png", render_script)
+        self.assertIn("Supplementary_Figure_S1B.tiff", render_script)
+        self.assertNotIn("Supplementary_Figure_S1B_strip", render_script)
+        self.assertIn("n = 1,591", render_script)
+        self.assertIn("n = 749 (47.1%)", render_script)
+        self.assertIn("n = 254 (16.0%)", render_script)
+        self.assertIn("n = 423 (26.6%)", render_script)
+        self.assertIn("n = 165 (10.4%)", render_script)
+        self.assertIn("RIPK3_below_threshold = 1003L", render_script)
+        self.assertIn("NLRP3_below_threshold = 1172L", render_script)
+        self.assertIn("both_below_threshold = 749L", render_script)
+
+        prep_script = (ROOT / "scripts" / "prepare_depmap_s1b.py").read_text(
+            encoding="utf-8"
         )
+        self.assertIn("mtime=0", prep_script)
+        self.assertIn('"release_pair_status": "unverified"', prep_script)
+        self.assertIn('"expression_release": "DepMap Public 25Q2"', prep_script)
+        self.assertIn('"model_release_identity_status": "unverified"', prep_script)
+        self.assertIn('"same_release_pair": None', prep_script)
+        self.assertIn("EXPECTED_EXPRESSION_ROWS = 1_739", prep_script)
+        self.assertIn("EXPECTED_DEFAULT_ROWS = 1_684", prep_script)
+        self.assertIn("EXPECTED_NONDEFAULT_ROWS = 55", prep_script)
+        self.assertIn("EXPECTED_MODEL_ROWS = 2_132", prep_script)
+        self.assertIn("EXPECTED_ELIGIBLE_MODELS = 1_591", prep_script)
+        self.assertIn(
+            "c44524c48e20f8c5c1263eb23cd55df77ceda62cfb5246babbe22cecc90c3da0",
+            prep_script,
+        )
+        self.assertIn(
+            "90bfdbe5c44cbb8f822e655ba7f179f3033933116285b6b2f85153b2d3d17c75",
+            prep_script,
+        )
+        self.assertIn(
+            "9dbb9de8805696c1345816ab07edd23fb4fd95e117739f3c5c3b1cf062c1233b",
+            prep_script,
+        )
+        self.assertIn("af4472ab734ea3aec974d992b504c7e5", prep_script)
+
+        derived_path = ROOT / "data" / "analysis" / (
+            "depmap_s1b_eligible_models.tsv.gz"
+        )
+        self.assertEqual(derived_path.stat().st_size, 47514)
+        self.assertEqual(
+            hashlib.sha256(derived_path.read_bytes()).hexdigest(),
+            "368ad92b085a722d3984a5355bea3109d8e5a2b29ffe563c3fd284cf8970f354",
+        )
+        with gzip.open(derived_path, "rt", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle, delimiter="\t"))
+        self.assertEqual(len(rows), 1591)
+        self.assertEqual(len({row["ModelID"] for row in rows}), 1591)
+        self.assertEqual(len({row["ProfileID"] for row in rows}), 1591)
+        self.assertFalse(
+            [
+                row for row in rows
+                if not row["OncotreePrimaryDisease"]
+                or row["OncotreePrimaryDisease"].upper() == "NON-CANCEROUS"
+            ]
+        )
+        ripk3_low = [row["RIPK3_below_threshold"] == "TRUE" for row in rows]
+        nlrp3_low = [row["NLRP3_below_threshold"] == "TRUE" for row in rows]
+        for row, ripk3_flag, nlrp3_flag in zip(rows, ripk3_low, nlrp3_low):
+            self.assertEqual(
+                ripk3_flag, float(row["RIPK3_log2_TPM_plus_1"]) < 0.5
+            )
+            self.assertEqual(
+                nlrp3_flag, float(row["NLRP3_log2_TPM_plus_1"]) < 0.5
+            )
+            expected_category = (
+                "Both below threshold" if ripk3_flag and nlrp3_flag
+                else "RIPK3 below threshold only" if ripk3_flag
+                else "NLRP3 below threshold only" if nlrp3_flag
+                else "Neither below threshold"
+            )
+            self.assertEqual(row["threshold_category"], expected_category)
+        self.assertEqual(sum(ripk3_low), 1003)
+        self.assertEqual(sum(nlrp3_low), 1172)
+        self.assertEqual(sum(a and b for a, b in zip(ripk3_low, nlrp3_low)), 749)
+        self.assertEqual(
+            sum(a and not b for a, b in zip(ripk3_low, nlrp3_low)), 254
+        )
+        self.assertEqual(
+            sum(not a and b for a, b in zip(ripk3_low, nlrp3_low)), 423
+        )
+        self.assertEqual(
+            sum(not a and not b for a, b in zip(ripk3_low, nlrp3_low)), 165
+        )
+
+        qc_path = ROOT / "data" / "analysis" / "depmap_s1b_preparation_qc.json"
+        provenance_path = (
+            ROOT / "data" / "analysis" / "depmap_s1b_source_provenance.json"
+        )
+        self.assertEqual(qc_path.stat().st_size, 1583)
+        self.assertEqual(
+            hashlib.sha256(qc_path.read_bytes()).hexdigest(),
+            "8d58a7113ca08c7ffd8297e26f3a3a29693e61e119186365c1fb04531d988b79",
+        )
+        self.assertEqual(provenance_path.stat().st_size, 1895)
+        self.assertEqual(
+            hashlib.sha256(provenance_path.read_bytes()).hexdigest(),
+            "e21b63f90835e80e71c388b13e167b214773cd6a988aa43a3aaac8cd65745242",
+        )
+        qc = json.loads(qc_path.read_text(encoding="utf-8"))
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        self.assertEqual(qc["join_qc"]["eligible_models"], 1591)
+        self.assertEqual(qc["derived_file"]["sha256"], hashlib.sha256(
+            derived_path.read_bytes()
+        ).hexdigest())
+        self.assertEqual(provenance["release_pair_status"], "unverified")
+        self.assertEqual(provenance["expression_release"], "DepMap Public 25Q2")
+        self.assertEqual(
+            provenance["model_release_identity_status"], "unverified"
+        )
+        self.assertIsNone(provenance["same_release_pair"])
+        self.assertFalse(provenance["tissue_origin_filter_applied"])
+
+        summary_path = ROOT / "reference_results" / "depmap_s1b_statistics.csv"
+        self.assertEqual(summary_path.stat().st_size, 305)
+        self.assertEqual(
+            hashlib.sha256(summary_path.read_bytes()).hexdigest(),
+            "60585de1dd22e879220d7d9da89d6cd762685b1b11af1d60b64627490e80e990",
+        )
+        summary_rows = read_csv(summary_path)
+        self.assertEqual(
+            [(row["metric"], row["n"], row["percent"]) for row in summary_rows],
+            [
+                ("RIPK3 below threshold", "1003", "63.0"),
+                ("NLRP3 below threshold", "1172", "73.7"),
+                ("Both below threshold", "749", "47.1"),
+                ("RIPK3 below threshold only", "254", "16.0"),
+                ("NLRP3 below threshold only", "423", "26.6"),
+                ("Neither below threshold", "165", "10.4"),
+            ],
+        )
+
+        documentation = (ROOT / "docs" / "DEPMAP_S1B.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("one default RNA-expression profile", documentation)
+        self.assertIn("RIPK3 below threshold | 1,003 | 63.0%", documentation)
+        self.assertIn("NLRP3 below threshold | 1,172 | 73.7%", documentation)
+        self.assertIn("Both below threshold | 749 | 47.1%", documentation)
+        self.assertIn("denominator must not", documentation)
+        self.assertIn('be called "human"', documentation)
+        self.assertIn("Do not silently label both files", documentation)
+
+        manifest_path = ROOT / "data" / "source_manifest.tsv"
+        with manifest_path.open("r", encoding="utf-8", newline="") as handle:
+            manifest = {
+                row["source_id"]: row
+                for row in csv.DictReader(handle, delimiter="\t")
+            }
+        archive = manifest["depmap_expression_archive_supplied"]
+        member = manifest["depmap_expression_csv_member_supplied"]
+        model = manifest["depmap_model_metadata_supplied"]
+        self.assertEqual(archive["cohort_id"], "DEPMAP_PUBLIC_25Q2")
+        self.assertEqual(member["cohort_id"], "DEPMAP_PUBLIC_25Q2")
+        self.assertEqual(model["cohort_id"], "DEPMAP_SOURCE_PAIR")
+        self.assertEqual(archive["size_bytes"], "249426032")
+        self.assertEqual(
+            archive["sha256"],
+            "c44524c48e20f8c5c1263eb23cd55df77ceda62cfb5246babbe22cecc90c3da0",
+        )
+        self.assertEqual(member["size_bytes"], "538420733")
+        self.assertEqual(
+            member["sha256"],
+            "90bfdbe5c44cbb8f822e655ba7f179f3033933116285b6b2f85153b2d3d17c75",
+        )
+        self.assertEqual(model["size_bytes"], "699474")
+        self.assertEqual(
+            model["sha256"],
+            "9dbb9de8805696c1345816ab07edd23fb4fd95e117739f3c5c3b1cf062c1233b",
+        )
+        self.assertIn("MD5 af4472ab734ea3aec974d992b504c7e5", model["notes"])
+
+    def test_depmap_s1b_ci_checks_publication_outputs(self) -> None:
+        workflow = (
+            ROOT / ".github" / "workflows" / "depmap-s1b.yml"
+        ).read_text(encoding="utf-8")
+        verifier = (
+            ROOT / "scripts" / "verify_depmap_s1b_outputs.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('r-version: "4.4.3"', workflow)
+        self.assertIn("setup-renv@v2", workflow)
+        self.assertIn("R/11_supplementary_1B.R", workflow)
+        self.assertIn("verify_depmap_s1b_outputs.py", workflow)
+        self.assertIn("depmap-supplementary-figure-s1b", workflow)
+        self.assertIn("(4260, 3840)", verifier)
+        self.assertIn('"release_pair_status": "unverified"', verifier)
+        self.assertIn('"n_models": "1591"', verifier)
+        self.assertIn("verify_image_pair", verifier)
 
     def test_signature_resource_has_ten_fixed_twenty_gene_sets(self) -> None:
         signature_path = ROOT / "resources" / "CAR_T_state_signatures.csv"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import os
 import re
@@ -351,9 +352,17 @@ class ReleaseVerifierTests(unittest.TestCase):
         )
         self.assertNotIn("Confirm the equivalence gate", workflow)
         self.assertIn("Render figures from the committed canonical adapters", workflow)
+        self.assertIn(
+            "Verify publication figure and numeric output contracts", workflow
+        )
+        self.assertIn("python3 scripts/verify_bulk_figure_outputs.py", workflow)
         self.assertNotIn("generated.read_bytes()", workflow)
         self.assertNotIn("cp results/bulk_rnaseq/figure_inputs", workflow)
-        for script_name in ("03_figure_1_B_C.R", "04_figure_2_B_suppl_S2D.R"):
+        expected_labels = {
+            "03_figure_1_B_C.R": verifier.FIGURE_1_LABEL_GENES,
+            "04_figure_2_B_suppl_S2D.R": verifier.FIGURE_2_LABEL_GENES,
+        }
+        for script_name, expected_genes in expected_labels.items():
             script = (ROOT / "R" / script_name).read_text()
             self.assertIn(
                 '"data", "experimental", "bulk_rnaseq", "derived"', script
@@ -365,9 +374,85 @@ class ReleaseVerifierTests(unittest.TestCase):
             observed_label_genes = tuple(
                 re.findall(r'"([A-Z0-9-]+)"', label_block.group(1))
             )
-            self.assertEqual(
-                observed_label_genes, verifier.MANUSCRIPT_LABEL_GENES
-            )
+            self.assertEqual(observed_label_genes, expected_genes)
+
+    def test_bulk_figure_r_environment_is_restored_from_the_committed_lock(
+        self,
+    ) -> None:
+        lock_path = ROOT / "renv.lock"
+        self.assertEqual(
+            hashlib.sha256(lock_path.read_bytes()).hexdigest(),
+            "bee59e0f7ea8f15f4dcc946d5a4173142860b4f30603105a03ba2a64b503327a",
+        )
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        self.assertEqual(lock["R"]["Version"], "4.4.3")
+        expected_versions = {
+            "data.table": "1.18.4",
+            "dplyr": "1.2.1",
+            "ggplot2": "4.0.3",
+            "ggrepel": "0.9.8",
+            "R.utils": "2.13.0",
+            "renv": "1.2.4",
+            "VennDiagram": "1.8.2",
+        }
+        self.assertEqual(
+            {
+                package: lock["Packages"][package]["Version"]
+                for package in expected_versions
+            },
+            expected_versions,
+        )
+
+        base_packages = {
+            "R", "base", "compiler", "datasets", "graphics", "grDevices",
+            "grid", "methods", "parallel", "splines", "stats", "stats4",
+            "tcltk", "tools", "utils",
+        }
+        locked_packages = set(lock["Packages"])
+        missing_dependencies = []
+        for package, record in lock["Packages"].items():
+            for field in ("Depends", "Imports", "LinkingTo"):
+                requirements = record.get(field, [])
+                if isinstance(requirements, str):
+                    requirements = [requirements]
+                for requirement in requirements:
+                    dependency = re.split(r"[ (]", requirement, maxsplit=1)[0]
+                    if (
+                        dependency
+                        and dependency not in base_packages
+                        and dependency not in locked_packages
+                    ):
+                        missing_dependencies.append((package, field, dependency))
+        self.assertEqual(missing_dependencies, [])
+
+        workflow = (ROOT / ".github" / "workflows" / "bulk-rnaseq.yml").read_text(
+            encoding="utf-8"
+        )
+        restore_position = workflow.index("r-lib/actions/setup-renv@v2")
+        render_position = workflow.index("Rscript R/render_bulk_rnaseq_figures.R")
+        archive_position = workflow.index(
+            "cp renv.lock results/release/renv_bulk_figures.lock"
+        )
+        self.assertLess(restore_position, render_position)
+        self.assertLess(render_position, archive_position)
+        self.assertIn('- "renv.lock"', workflow)
+        self.assertIn('- "R/render_bulk_rnaseq_figures.R"', workflow)
+        self.assertIn(
+            "cmp renv.lock results/release/renv_bulk_figures.lock", workflow
+        )
+        self.assertNotIn("install.packages(", workflow)
+        self.assertNotIn("renv::snapshot(", workflow)
+
+        entry_point = (ROOT / "R" / "render_bulk_rnaseq_figures.R").read_text(
+            encoding="utf-8"
+        )
+        figure_1_position = entry_point.index('"03_figure_1_B_C.R"')
+        figure_2_position = entry_point.index('"04_figure_2_B_suppl_S2D.R"')
+        session_position = entry_point.index("capture.output(sessionInfo())")
+        self.assertLess(figure_1_position, session_position)
+        self.assertLess(figure_2_position, session_position)
+        for namespace in ("ggplot2", "ggrepel", "scales", "VennDiagram"):
+            self.assertIn(namespace, entry_point)
 
     def test_runtime_provenance_contains_platform_and_numeric_library_details(
         self,

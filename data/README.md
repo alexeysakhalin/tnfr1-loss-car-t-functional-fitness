@@ -17,6 +17,10 @@ exports in one directory.
 |---|---|---|
 | `data/source_manifest.tsv` | Source URLs, citations, accessions, licences, expected filenames and SHA-256 values | yes |
 | `data/experimental/` | Non-identifying project-derived transcriptomic analysis tables, checksums and QC | yes |
+| `data/depmap/raw/` | Checksum-pinned DepMap expression ZIP and `Model.csv` used for S1B | no |
+| `data/analysis/depmap_s1b_eligible_models.tsv.gz` | Eligible DepMap S1B models, expression, flags and quadrants | yes |
+| `data/analysis/depmap_s1b_preparation_qc.json` | Source-selection, join and denominator QC for S1B | yes |
+| `data/analysis/depmap_s1b_source_provenance.json` | Raw-source hashes and release-pair status for S1B | yes |
 | `resources/analysis_gene_identifiers.tsv` | Frozen identifiers for the 181 analysis genes, derived from the declared HGNC snapshot | yes |
 | `resources/hgnc_20260814_gene_identifiers.tsv.gz` | Frozen full HGNC mapping used before transcriptome-wide ranking | yes |
 | `data/raw/` | Publisher files and package exports | no |
@@ -150,3 +154,26 @@ transformations. Two explicit compressed TSV contracts plus a source manifest
 make every transformation inspectable without a database schema or hidden
 import state. Full matrices remain in their publisher formats; selected local
 tables are regenerated when gene sets or source versions change.
+
+## DepMap Supplementary Figure S1B
+
+The DepMap source is not patient-cohort data and is not combined with the four
+clinical cohorts. The complete expression archive and source `Model.csv`
+remain local-only. Exact filenames, byte sizes, SHA-256 values, the metadata
+MD5 and redistribution policy are recorded in `source_manifest.tsv`.
+
+`scripts/prepare_depmap_s1b.py` selects 1,684
+`is_default_entry=True` expression records, one per unique `ModelID`, joins
+them to `Model.csv`, and retains 1,591 records annotated as `Cell Line` with a
+non-empty OncoTree primary disease other than `Non-Cancerous`. `TissueOrigin`
+is empty in the supplied metadata and is not used as a filter. The compact
+tracked derivative contains only the model/profile identifiers, disease label,
+two expression values, threshold flags and quadrant assignment.
+
+`R/11_supplementary_1B.R` reads that tracked derivative, QC, provenance and
+statistics contract, so a clean clone can render the panel without the full
+raw files. The expression matrix is fixed as DepMap Public 25Q2; the
+`Model.csv` release identity and release-pair status remain machine-locked as
+unverified. The current contract therefore does not support calling the two
+supplied files a same-release 25Q2 pair. The complete contract, fixed counts
+and wording restrictions are documented in `docs/DEPMAP_S1B.md`.

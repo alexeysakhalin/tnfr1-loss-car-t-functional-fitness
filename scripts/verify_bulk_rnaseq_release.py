@@ -38,28 +38,21 @@ WALD_RTOL = 1e-10
 WALD_ATOL = 1e-12
 PRESPECIFIED_INTERACTION_GENES = ("ICAM1", "MLKL", "GSDME", "IRF1")
 MANUSCRIPT_LABEL_LFC_ATOL = 0.001
-MANUSCRIPT_LABEL_GENES = (
-    "CASP3",
-    "CASP7",
-    "CASP8",
-    "CASP9",
-    "BAX",
-    "BAK1",
-    "BCL2",
-    "FAS",
-    "APAF1",
-    "GSDMD",
-    "GSDME",
-    "CASP1",
-    "CASP4",
-    "CASP5",
-    "AIM2",
-    "NLRP3",
-    "RIPK1",
-    "RIPK3",
-    "MLKL",
+FIGURE_1_LABEL_GENES = (
     "ICAM1",
     "IRF1",
+    "AIM2",
+    "CASP1",
+    "CASP4",
+    "MLKL",
+    "BAK1",
+    "CASP7",
+    "FAS",
+    "CASP8",
+)
+FIGURE_2_LABEL_GENES = ("ICAM1", "MLKL", "GSDME", "IRF1")
+MANUSCRIPT_LABEL_GENES = tuple(
+    dict.fromkeys(FIGURE_1_LABEL_GENES + FIGURE_2_LABEL_GENES)
 )
 
 
@@ -124,7 +117,7 @@ TABLE_CONTRACTS = (
         adjusted_p_column="adjusted_p_value",
         venn_conditions=CYTOKINE_VENN_CONDITIONS,
         venn_direction="up",
-        guarded_effect_genes=MANUSCRIPT_LABEL_GENES,
+        guarded_effect_genes=FIGURE_1_LABEL_GENES,
     ),
     TableContract(
         generated_relative_path=(
@@ -152,7 +145,7 @@ TABLE_CONTRACTS = (
         adjusted_p_column="adjusted_p_value",
         venn_conditions=CYTOKINE_VENN_CONDITIONS,
         venn_direction="down",
-        guarded_effect_genes=MANUSCRIPT_LABEL_GENES,
+        guarded_effect_genes=FIGURE_2_LABEL_GENES,
     ),
     *(
         TableContract(

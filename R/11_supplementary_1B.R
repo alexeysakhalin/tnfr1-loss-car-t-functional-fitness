@@ -1,260 +1,285 @@
-# Supplementary Figure S1B: release-locked DepMap RIPK3/NLRP3 analysis.
+# Supplementary Figure S1B from the tracked DepMap derivative.
 #
-# This script intentionally stops unless the exact DepMap release, official
-# source URL, download date and SHA-256 checksums are provided. A release DOI
-# is recorded when one exists but is not required because recent public
-# releases are distributed directly through the DepMap portal. The analysis
-# retains one official default expression entry per human tumor-derived
-# cell-line model. The same fixed cutoff (0.5 log2(TPM+1)) is used for
-# statistics and plotted dividers.
+# scripts/prepare_depmap_s1b.py validates and reduces the large third-party
+# sources. This renderer uses only packages already locked for figure builds
+# and cannot inject a DepMap release label while source pairing is unverified.
 
 suppressPackageStartupMessages({
   library(data.table)
-  library(dplyr)
-  library(tidyr)
-  library(readr)
   library(ggplot2)
-  library(digest)
-  library(jsonlite)
 })
 
-data_dir <- file.path("data", "depmap")
-out_dir <- file.path("results", "supplementary_S1B")
-expr_file <- file.path(data_dir, "OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv")
-model_file <- file.path(data_dir, "Model.csv")
+input_file <- file.path(
+  "data", "analysis", "depmap_s1b_eligible_models.tsv.gz"
+)
+qc_file <- file.path(
+  "data", "analysis", "depmap_s1b_preparation_qc.json"
+)
+source_provenance_file <- file.path(
+  "data", "analysis", "depmap_s1b_source_provenance.json"
+)
+summary_file <- file.path(
+  "reference_results", "depmap_s1b_statistics.csv"
+)
+out_dir <- Sys.getenv(
+  "DEPMAP_OUTPUT_DIR",
+  unset = file.path("results", "supplementary_S1B")
+)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-metadata <- c(
-  release = Sys.getenv("DEPMAP_RELEASE"),
-  release_url = Sys.getenv("DEPMAP_RELEASE_URL"),
-  download_date = Sys.getenv("DEPMAP_DOWNLOAD_DATE"),
-  expression_sha256 = Sys.getenv("DEPMAP_EXPRESSION_SHA256"),
-  model_sha256 = Sys.getenv("DEPMAP_MODEL_SHA256")
+expected_sizes <- c(
+  input = 47514,
+  qc = 1583,
+  source_provenance = 1895,
+  summary = 305
 )
-if (any(!nzchar(metadata))) {
-  stop(
-    "Set DEPMAP_RELEASE, DEPMAP_RELEASE_URL, DEPMAP_DOWNLOAD_DATE, ",
-    "DEPMAP_EXPRESSION_SHA256 and DEPMAP_MODEL_SHA256 before running."
-  )
+tracked_files <- c(
+  input = input_file,
+  qc = qc_file,
+  source_provenance = source_provenance_file,
+  summary = summary_file
+)
+missing_files <- tracked_files[!file.exists(tracked_files)]
+if (length(missing_files)) {
+  stop("Missing tracked S1B input: ", unname(missing_files[[1]]))
 }
-if (!grepl(
-  "^https://([A-Za-z0-9-]+\\.)?depmap\\.org/",
-  metadata[["release_url"]], ignore.case = TRUE
-)) {
-  stop("DEPMAP_RELEASE_URL must be an official depmap.org HTTPS URL.")
-}
-release_doi <- Sys.getenv("DEPMAP_RELEASE_DOI")
-if (nzchar(release_doi) && !grepl("^10\\.[0-9]{4,9}/", release_doi)) {
-  stop("DEPMAP_RELEASE_DOI is not DOI-shaped.")
-}
-if (!grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", metadata[["download_date"]])) {
-  stop("DEPMAP_DOWNLOAD_DATE must use YYYY-MM-DD.")
+observed_sizes <- vapply(
+  tracked_files,
+  function(path) unname(file.info(path)$size),
+  numeric(1)
+)
+if (!identical(as.numeric(observed_sizes), as.numeric(expected_sizes))) {
+  stop("A tracked S1B input has an unexpected byte size.")
 }
 
-assert_checksum <- function(path, expected) {
-  if (!file.exists(path)) stop("Missing input: ", path)
-  if (!grepl("^[0-9A-Fa-f]{64}$", expected)) stop("Invalid SHA-256 for ", path)
-  observed <- digest::digest(path, algo = "sha256", file = TRUE)
-  if (tolower(observed) != tolower(expected)) {
-    stop("SHA-256 mismatch for ", path, "; observed ", observed)
+# This state is intentionally not configurable at render time. Source hashes,
+# release status and same-release=null are checked by the Python preparation
+# contract and repository tests. Confirmation requires a reviewed data update.
+release_pair_status <- "unverified"
+expression_release <- "DepMap Public 25Q2"
+model_release_identity_status <- "unverified"
+
+expected_columns <- c(
+  "ProfileID",
+  "ModelID",
+  "OncotreePrimaryDisease",
+  "RIPK3_log2_TPM_plus_1",
+  "NLRP3_log2_TPM_plus_1",
+  "RIPK3_below_threshold",
+  "NLRP3_below_threshold",
+  "threshold_category"
+)
+analysis <- fread(input_file, showProgress = FALSE)
+if (!identical(names(analysis), expected_columns)) {
+  stop("The tracked S1B derivative has an unexpected column schema.")
+}
+
+parse_flag <- function(x, field) {
+  if (is.logical(x)) {
+    if (anyNA(x)) stop(field, " contains a missing value.")
+    return(x)
   }
-  observed
-}
-observed_expression_sha256 <- assert_checksum(expr_file, metadata[["expression_sha256"]])
-observed_model_sha256 <- assert_checksum(model_file, metadata[["model_sha256"]])
-
-expr_header <- names(fread(expr_file, nrows = 0, showProgress = FALSE))
-model_header <- names(fread(model_file, nrows = 0, showProgress = FALSE))
-required_model <- c("ModelID", "ModelType", "TissueOrigin", "OncotreePrimaryDisease")
-if (length(setdiff(required_model, model_header))) {
-  stop("Model.csv lacks required human tumor cell-line fields: ",
-       paste(setdiff(required_model, model_header), collapse = ", "))
-}
-default_candidates <- c(
-  "IsDefaultEntryForModel", "IsDefaultEntry", "isDefaultEntryForModel",
-  "is_default_entry"
-)
-default_flag <- intersect(default_candidates, expr_header)[1]
-if (is.na(default_flag) || !"ModelID" %in% expr_header) {
-  stop("Expression file lacks ModelID or a recognized default-entry field.")
-}
-
-find_gene_column <- function(symbol) {
-  hits <- grep(paste0("^", symbol, "(\\s|$|\\()"), expr_header, value = TRUE)
-  if (length(hits) != 1L) {
-    stop("Expected one expression column for ", symbol, "; found ", length(hits), ".")
+  normalized <- toupper(trimws(as.character(x)))
+  if (!all(normalized %in% c("TRUE", "FALSE"))) {
+    stop(field, " must contain only TRUE or FALSE.")
   }
-  hits[[1]]
-}
-gene_columns <- setNames(
-  vapply(c("RIPK3", "NLRP3"), find_gene_column, character(1)),
-  c("RIPK3", "NLRP3")
-)
-
-model_rows <- fread(
-  model_file, select = required_model, showProgress = FALSE
-) |>
-  as_tibble() |>
-  transmute(
-    ModelID = as.character(.data$ModelID),
-    ModelType = trimws(as.character(.data$ModelType)),
-    TissueOrigin = trimws(as.character(.data$TissueOrigin)),
-    OncotreePrimaryDisease = trimws(as.character(.data$OncotreePrimaryDisease))
-  )
-if (any(is.na(model_rows$ModelID)) || any(model_rows$ModelID == "") ||
-    anyDuplicated(model_rows$ModelID)) {
-  stop("Model.csv must contain one non-empty, unique row per ModelID.")
+  normalized == "TRUE"
 }
 
-eligible_models <- model_rows |>
-  filter(
-    toupper(.data$ModelType) == "CELL LINE",
-    toupper(.data$TissueOrigin) == "HUMAN",
-    !is.na(.data$OncotreePrimaryDisease),
-    .data$OncotreePrimaryDisease != "",
-    toupper(.data$OncotreePrimaryDisease) != "NON-CANCEROUS"
-  )
-if (!nrow(eligible_models)) stop("No eligible human tumor cell-line models found.")
+analysis[, ProfileID := trimws(as.character(ProfileID))]
+analysis[, ModelID := trimws(as.character(ModelID))]
+analysis[, OncotreePrimaryDisease := trimws(
+  as.character(OncotreePrimaryDisease)
+)]
+analysis[, RIPK3 := suppressWarnings(as.numeric(RIPK3_log2_TPM_plus_1))]
+analysis[, NLRP3 := suppressWarnings(as.numeric(NLRP3_log2_TPM_plus_1))]
+analysis[, RIPK3_below_threshold := parse_flag(
+  RIPK3_below_threshold, "RIPK3_below_threshold"
+)]
+analysis[, NLRP3_below_threshold := parse_flag(
+  NLRP3_below_threshold, "NLRP3_below_threshold"
+)]
+analysis[, threshold_category := trimws(as.character(threshold_category))]
 
-expression_rows <- fread(
-  expr_file,
-  select = c("ModelID", default_flag, unname(gene_columns)),
-  showProgress = FALSE
-) |>
-  as_tibble() |>
-  transmute(
-    ModelID = as.character(.data$ModelID),
-    default_entry = toupper(trimws(as.character(.data[[default_flag]]))),
-    RIPK3 = suppressWarnings(as.numeric(.data[[gene_columns[["RIPK3"]]]])),
-    NLRP3 = suppressWarnings(as.numeric(.data[[gene_columns[["NLRP3"]]]]))
-  )
-expression <- expression_rows |>
-  filter(.data$default_entry %in% c("YES", "TRUE", "1")) |>
-  select(-default_entry)
-if (anyDuplicated(expression$ModelID)) {
-  stop("Multiple default expression entries remain for at least one ModelID.")
+if (nrow(analysis) != 1591L ||
+    any(analysis$ProfileID == "") || anyDuplicated(analysis$ProfileID) ||
+    any(analysis$ModelID == "") || anyDuplicated(analysis$ModelID) ||
+    !all(grepl("^ACH-[0-9]{6}$", analysis$ModelID)) ||
+    any(analysis$OncotreePrimaryDisease == "") ||
+    any(toupper(analysis$OncotreePrimaryDisease) == "NON-CANCEROUS") ||
+    !all(is.finite(analysis$RIPK3)) || !all(is.finite(analysis$NLRP3))) {
+  stop("The tracked S1B derivative fails its row, identifier or value contract.")
 }
-missing_model_ids <- setdiff(expression$ModelID, model_rows$ModelID)
-if (length(missing_model_ids) > 0L) {
-  stop(
-    "Model.csv is missing ", length(missing_model_ids),
-    " default-expression ModelID values; first: ", missing_model_ids[[1]]
-  )
-}
-
-analysis <- eligible_models |>
-  inner_join(expression, by = "ModelID") |>
-  filter(is.finite(.data$RIPK3), is.finite(.data$NLRP3))
-if (nrow(analysis) < 100L) stop("Unexpectedly few eligible DepMap models.")
-
-qc_counts <- tibble(
-  stage = c(
-    "expression_profiles_source", "expression_profiles_default",
-    "models_source", "human_cell_line_models",
-    "non_cancerous_models_excluded", "final_complete_models"
-  ),
-  n = c(
-    nrow(expression_rows), nrow(expression), nrow(model_rows),
-    sum(
-      toupper(model_rows$ModelType) == "CELL LINE" &
-        toupper(model_rows$TissueOrigin) == "HUMAN",
-      na.rm = TRUE
-    ),
-    sum(
-      toupper(model_rows$ModelType) == "CELL LINE" &
-        toupper(model_rows$TissueOrigin) == "HUMAN" &
-        toupper(model_rows$OncotreePrimaryDisease) == "NON-CANCEROUS",
-      na.rm = TRUE
-    ),
-    nrow(analysis)
-  )
-)
-write_csv(qc_counts, file.path(out_dir, "Supplementary_Figure_S1B_input_qc.csv"))
 
 cutoff <- 0.5
-analysis <- analysis |>
-  mutate(
-    RIPK3_low = .data$RIPK3 < cutoff,
-    NLRP3_low = .data$NLRP3 < cutoff,
-    quadrant = case_when(
-      .data$RIPK3_low & .data$NLRP3_low ~ "Both low",
-      .data$RIPK3_low & !.data$NLRP3_low ~ "RIPK3 low only",
-      !.data$RIPK3_low & .data$NLRP3_low ~ "NLRP3 low only",
-      TRUE ~ "Neither low"
+if (!identical(analysis$RIPK3_below_threshold, analysis$RIPK3 < cutoff) ||
+    !identical(analysis$NLRP3_below_threshold, analysis$NLRP3 < cutoff)) {
+  stop("Stored threshold flags do not agree with the expression values.")
+}
+
+expected_category <- ifelse(
+  analysis$RIPK3_below_threshold & analysis$NLRP3_below_threshold,
+  "Both below threshold",
+  ifelse(
+    analysis$RIPK3_below_threshold,
+    "RIPK3 below threshold only",
+    ifelse(
+      analysis$NLRP3_below_threshold,
+      "NLRP3 below threshold only",
+      "Neither below threshold"
     )
   )
-
-summary_table <- bind_rows(
-  tibble(
-    metric = c("RIPK3 low", "NLRP3 low"),
-    n = c(sum(analysis$RIPK3_low), sum(analysis$NLRP3_low)),
-    denominator = nrow(analysis)
-  ),
-  analysis |>
-    count(.data$quadrant, name = "n") |>
-    transmute(metric = paste("Quadrant", .data$quadrant), .data$n,
-              denominator = nrow(analysis))
-) |>
-  mutate(percent = 100 * .data$n / .data$denominator, cutoff = cutoff)
-write_csv(summary_table, file.path(out_dir, "Supplementary_Figure_S1B_statistics.csv"))
-
-long <- analysis |>
-  select(.data$ModelID, .data$RIPK3, .data$NLRP3) |>
-  pivot_longer(c("RIPK3", "NLRP3"), names_to = "gene", values_to = "expression") |>
-  mutate(low = .data$expression < cutoff)
-set.seed(20260814)
-p_strip <- ggplot(long, aes(.data$expression, .data$gene, color = .data$low)) +
-  geom_jitter(height = 0.16, width = 0, size = 1.2, alpha = 0.6) +
-  geom_vline(xintercept = cutoff, linetype = "dashed", color = "#1F77B4") +
-  scale_color_manual(values = c(`TRUE` = "#1F77B4", `FALSE` = "#D62728")) +
-  labs(
-    title = "RIPK3 and NLRP3 expression in human tumor cell-line models",
-    subtitle = paste(metadata[["release"]], "; default expression entries; cutoff 0.5"),
-    x = "Expression, log2(TPM+1)", y = NULL
-  ) +
-  theme_classic(base_size = 14) +
-  theme(legend.position = "none")
-
-p_scatter <- ggplot(analysis, aes(.data$RIPK3, .data$NLRP3)) +
-  geom_point(alpha = 0.45, size = 1.5, color = "grey30") +
-  geom_vline(xintercept = cutoff, linetype = "dashed", color = "#1F77B4") +
-  geom_hline(yintercept = cutoff, linetype = "dashed", color = "#1F77B4") +
-  labs(
-    title = "RIPK3 versus NLRP3 expression",
-    subtitle = sprintf("Human tumor cell-line models; n=%d", nrow(analysis)),
-    x = "RIPK3, log2(TPM+1)", y = "NLRP3, log2(TPM+1)"
-  ) +
-  theme_classic(base_size = 14)
-
-ggsave(file.path(out_dir, "Supplementary_Figure_S1B_strip.png"),
-       p_strip, width = 8, height = 3.8, dpi = 600, bg = "white")
-ggsave(file.path(out_dir, "Supplementary_Figure_S1B_strip.tiff"),
-       p_strip, width = 8, height = 3.8, dpi = 600,
-       compression = "lzw", bg = "white")
-ggsave(file.path(out_dir, "Supplementary_Figure_S1B_scatter.png"),
-       p_scatter, width = 6, height = 5.5, dpi = 600, bg = "white")
-ggsave(file.path(out_dir, "Supplementary_Figure_S1B_scatter.tiff"),
-       p_scatter, width = 6, height = 5.5, dpi = 600,
-       compression = "lzw", bg = "white")
-
-provenance <- list(
-  depmap_release = metadata[["release"]],
-  depmap_release_url = metadata[["release_url"]],
-  depmap_release_doi = if (nzchar(release_doi)) release_doi else NA_character_,
-  download_date = metadata[["download_date"]],
-  expression_sha256 = observed_expression_sha256,
-  model_sha256 = observed_model_sha256,
-  default_entry_field = default_flag,
-  model_filters = list(
-    ModelType = "Cell Line", TissueOrigin = "Human",
-    OncotreePrimaryDisease = "non-empty and not Non-Cancerous"
-  ),
-  n_models = nrow(analysis),
-  cutoff_log2_tpm_plus_1 = cutoff
 )
-write_json(
-  provenance,
-  file.path(out_dir, "Supplementary_Figure_S1B_provenance.json"),
-  pretty = TRUE, auto_unbox = TRUE
+if (!identical(analysis$threshold_category, expected_category)) {
+  stop("Stored threshold categories do not agree with the threshold flags.")
+}
+
+expected_metric_counts <- c(
+  RIPK3_below_threshold = 1003L,
+  NLRP3_below_threshold = 1172L,
+  both_below_threshold = 749L,
+  RIPK3_below_threshold_only = 254L,
+  NLRP3_below_threshold_only = 423L,
+  neither_below_threshold = 165L
+)
+observed_metric_counts <- c(
+  RIPK3_below_threshold = sum(analysis$RIPK3_below_threshold),
+  NLRP3_below_threshold = sum(analysis$NLRP3_below_threshold),
+  both_below_threshold = sum(
+    analysis$RIPK3_below_threshold & analysis$NLRP3_below_threshold
+  ),
+  RIPK3_below_threshold_only = sum(
+    analysis$RIPK3_below_threshold & !analysis$NLRP3_below_threshold
+  ),
+  NLRP3_below_threshold_only = sum(
+    !analysis$RIPK3_below_threshold & analysis$NLRP3_below_threshold
+  ),
+  neither_below_threshold = sum(
+    !analysis$RIPK3_below_threshold & !analysis$NLRP3_below_threshold
+  )
+)
+if (!identical(
+  as.integer(observed_metric_counts), as.integer(expected_metric_counts)
+)) {
+  stop("Observed threshold counts differ from the locked S1B contract.")
+}
+
+summary_table <- fread(summary_file, showProgress = FALSE)
+if (nrow(summary_table) != 6L ||
+    any(summary_table$denominator != 1591L) ||
+    any(summary_table$cutoff_log2_tpm_plus_1 != cutoff) ||
+    !identical(
+      as.integer(summary_table$n), as.integer(expected_metric_counts)
+    ) ||
+    any(abs(
+      summary_table$percent - round(100 * summary_table$n / 1591, 1)
+    ) > 1e-12)) {
+  stop("The tracked statistics table differs from the locked S1B contract.")
+}
+
+category_levels <- c(
+  "Both below threshold",
+  "RIPK3 below threshold only",
+  "NLRP3 below threshold only",
+  "Neither below threshold"
+)
+category_labels <- c(
+  "Both below threshold" = "Both below: n = 749 (47.1%)",
+  "RIPK3 below threshold only" = "RIPK3 below only: n = 254 (16.0%)",
+  "NLRP3 below threshold only" = "NLRP3 below only: n = 423 (26.6%)",
+  "Neither below threshold" = "Neither below: n = 165 (10.4%)"
+)
+category_colors <- setNames(
+  c("#4C78A8", "#F58518", "#54A24B", "#B279A2"),
+  unname(category_labels[category_levels])
+)
+analysis[, plot_category := factor(
+  unname(category_labels[threshold_category]),
+  levels = unname(category_labels[category_levels])
+)]
+
+x_upper <- max(analysis$RIPK3) * 1.02
+y_upper <- max(analysis$NLRP3) * 1.02
+panel <- ggplot(
+  analysis,
+  aes(x = RIPK3, y = NLRP3, color = plot_category)
+) +
+  geom_point(size = 1.5, alpha = 0.58) +
+  geom_vline(xintercept = cutoff, linetype = "dashed", color = "grey25") +
+  geom_hline(yintercept = cutoff, linetype = "dashed", color = "grey25") +
+  scale_color_manual(values = category_colors, drop = FALSE) +
+  coord_cartesian(
+    xlim = c(0, x_upper), ylim = c(0, y_upper),
+    expand = FALSE, clip = "off"
+  ) +
+  guides(color = guide_legend(
+    nrow = 2, byrow = TRUE,
+    override.aes = list(size = 3, alpha = 1)
+  )) +
+  labs(
+    title = "RIPK3 and NLRP3 expression in DepMap cell-line models",
+    subtitle = paste0(
+      "Eligible models (n = 1,591); dashed lines, 0.5 log2(TPM+1)"
+    ),
+    x = "RIPK3 expression, log2(TPM+1)",
+    y = "NLRP3 expression, log2(TPM+1)",
+    color = NULL,
+    caption = paste0(
+      "Eligibility: ModelType = Cell Line; OncoTree primary disease ",
+      "not annotated as Non-Cancerous."
+    )
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 8.5),
+    legend.key.width = grid::unit(0.9, "lines"),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(size = 10.5),
+    plot.caption = element_text(hjust = 0, size = 8.5, color = "grey30"),
+    plot.margin = margin(8, 12, 8, 8)
+  )
+
+ggsave(
+  file.path(out_dir, "Supplementary_Figure_S1B.png"),
+  panel, width = 7.1, height = 6.4, dpi = 600, bg = "white"
+)
+ggsave(
+  file.path(out_dir, "Supplementary_Figure_S1B.tiff"),
+  panel, width = 7.1, height = 6.4, dpi = 600,
+  compression = "lzw", bg = "white"
+)
+
+runtime_provenance <- data.table(
+  field = c(
+    "release_pair_status",
+    "expression_release",
+    "model_release_identity_status",
+    "derived_file",
+    "population",
+    "n_models",
+    "cutoff_log2_tpm_plus_1",
+    names(observed_metric_counts),
+    "tissue_origin_filter_applied"
+  ),
+  value = c(
+    release_pair_status,
+    expression_release,
+    model_release_identity_status,
+    basename(input_file),
+    paste0(
+      "DepMap cell-line models with a non-missing OncoTree primary-disease ",
+      "label other than Non-Cancerous"
+    ),
+    as.character(nrow(analysis)),
+    as.character(cutoff),
+    as.character(observed_metric_counts),
+    "FALSE"
+  )
+)
+fwrite(
+  runtime_provenance,
+  file.path(out_dir, "Supplementary_Figure_S1B_runtime_provenance.tsv"),
+  sep = "\t", quote = TRUE
 )
 writeLines(capture.output(sessionInfo()), file.path(out_dir, "sessionInfo.txt"))

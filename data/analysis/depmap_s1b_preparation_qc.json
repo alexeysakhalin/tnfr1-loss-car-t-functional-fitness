@@ -1,0 +1,57 @@
+{
+  "contract_version": 1,
+  "derived_file": {
+    "columns": [
+      "ProfileID",
+      "ModelID",
+      "OncotreePrimaryDisease",
+      "RIPK3_log2_TPM_plus_1",
+      "NLRP3_log2_TPM_plus_1",
+      "RIPK3_below_threshold",
+      "NLRP3_below_threshold",
+      "threshold_category"
+    ],
+    "compression": "gzip level 9; mtime 0; no original filename",
+    "filename": "depmap_s1b_eligible_models.tsv.gz",
+    "rows": 1591,
+    "sha256": "368ad92b085a722d3984a5355bea3109d8e5a2b29ffe563c3fd284cf8970f354",
+    "size_bytes": 47514,
+    "sort_order": [
+      "ModelID"
+    ]
+  },
+  "expression_qc": {
+    "default_profile_rows": 1684,
+    "nondefault_profile_rows": 55,
+    "source_profile_rows": 1739,
+    "unique_default_model_ids": 1684,
+    "unique_default_profile_ids": 1684
+  },
+  "join_qc": {
+    "default_cell_lines_annotated_non_cancerous": 93,
+    "default_profiles_annotated_cell_line": 1684,
+    "default_profiles_matched_to_metadata": 1684,
+    "eligible_models": 1591,
+    "threshold_counts": {
+      "NLRP3_below_threshold": 1172,
+      "NLRP3_below_threshold_only": 423,
+      "RIPK3_below_threshold": 1003,
+      "RIPK3_below_threshold_only": 254,
+      "both_below_threshold": 749,
+      "neither_below_threshold": 165
+    },
+    "threshold_log2_tpm_plus_1": 0.5
+  },
+  "model_qc": {
+    "model_type_counts": {
+      "Cell Line": 2108,
+      "Organoid": 24
+    },
+    "non_cancerous_rows": 151,
+    "rows": 2132,
+    "tissue_origin_filter_applied": false,
+    "tissue_origin_nonempty_rows": 0,
+    "tissue_origin_present": true,
+    "unique_model_ids": 2132
+  }
+}

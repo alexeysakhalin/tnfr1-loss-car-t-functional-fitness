@@ -129,6 +129,15 @@ zlib versions, NumPy build configuration, and numerical-library thread
 environment. Runtime provenance is diagnostic and is not required to match a
 different host.
 
+The repository-root `renv.lock` fixes R 4.4.3 and the complete dependency
+closure used by the Figure 1B-C, Figure 2B and Supplementary Figure S2D
+rendering scripts. The workflow restores this committed lock with
+`r-lib/actions/setup-renv` before rendering. It does not install unversioned
+packages or create a post-hoc snapshot. `R/render_bulk_rnaseq_figures.R` runs
+both figure scripts and records `sessionInfo()` in the same R process after the
+panels have been written. The figure artifact includes a byte-identical copy of
+the committed lock and its SHA-256 checksum.
+
 ## Release-outcome check
 
 `scripts/verify_bulk_rnaseq_release.py` keeps schema, semantic keys and row
@@ -140,9 +149,10 @@ log2 fold change `> 1` or `< -1`) must be identical. Figure 1C and
 Supplementary Figure S2D Venn membership and the significance/direction calls
 for ICAM1, MLKL, GSDME, and IRF1 in the interaction analyses must also be
 identical. Both the regenerated and committed tables are independently checked
-for the Wald identity `stat = log2FoldChange / lfcSE`. For the 21 genes labelled
-in the volcano plots, regenerated log2 fold changes must be within an absolute
-difference of `0.001` of the committed value wherever estimable.
+for the Wald identity `stat = log2FoldChange / lfcSE`. For the prespecified
+genes actually labelled in each volcano group (ten in Figure 1B and four in
+Figure 2B), regenerated log2 fold changes must be within an absolute difference
+of `0.001` of the committed value wherever estimable.
 
 Small changes in numerically unstable model tails can occur across BLAS and
 libm implementations even with the locked package environment. Raw numeric
