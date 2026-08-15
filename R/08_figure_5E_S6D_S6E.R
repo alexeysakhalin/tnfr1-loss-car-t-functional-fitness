@@ -88,7 +88,20 @@ cluster_cols <- c(
 save_km <- function(endpoint, cluster, filename) {
   key <- paste(endpoint, cluster, sep = "_")
   fit <- fits[[key]]
-  r <- results |> filter(.data$endpoint == endpoint, .data$signature == cluster)
+  r <- results |>
+    filter(
+      .data$endpoint == .env$endpoint,
+      .data$signature == .env$cluster
+    )
+  if (nrow(r) != 1L) {
+    stop(
+      sprintf(
+        "Expected exactly one survival result for endpoint=%s and signature=%s; found %d.",
+        endpoint, cluster, nrow(r)
+      ),
+      call. = FALSE
+    )
+  }
   subtitle <- sprintf(
     paste0("Nivolumab only; trial-stratified Cox HR %.2f (95%% CI %.2f-%.2f), ",
            "p=%.3g, BH p=%.3g; descriptive log-rank p=%.3g, BH p=%.3g"),

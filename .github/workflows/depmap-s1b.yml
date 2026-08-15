@@ -13,6 +13,18 @@ on:
       - "scripts/verify_depmap_s1b_outputs.py"
       - "R/11_supplementary_1B.R"
       - "renv.lock"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/depmap-s1b.yml"
+      - "data/analysis/depmap_s1b_eligible_models.tsv.gz"
+      - "data/analysis/depmap_s1b_preparation_qc.json"
+      - "data/analysis/depmap_s1b_source_provenance.json"
+      - "reference_results/depmap_s1b_statistics.csv"
+      - "scripts/prepare_depmap_s1b.py"
+      - "scripts/verify_depmap_s1b_outputs.py"
+      - "R/11_supplementary_1B.R"
+      - "renv.lock"
 
 permissions:
   contents: read

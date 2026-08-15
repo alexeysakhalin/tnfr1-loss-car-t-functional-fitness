@@ -82,6 +82,7 @@ global_models <- global_models |>
   mutate(
     BH_p = p.adjust(.data$p, method = "BH"),
     neglog10_p = -log10(pmax(.data$p, .Machine$double.xmin)),
+    neglog10_BH_p = -log10(pmax(.data$BH_p, .Machine$double.xmin)),
     direction = if_else(
       .data$beta >= 0,
       "higher in adjusted C6-high", "higher in adjusted C6-low"
@@ -127,7 +128,7 @@ if (length(unknown_blocks)) {
   stop("Unrecognized Figure 5F display blocks: ", paste(unknown_blocks, collapse = ", "))
 }
 
-volcano_plot <- ggplot(global_models, aes(.data$beta, .data$neglog10_p)) +
+volcano_plot <- ggplot(global_models, aes(.data$beta, .data$neglog10_BH_p)) +
   geom_point(color = "grey78", alpha = 0.35, size = 1.5) +
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "grey45") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey45") +
@@ -145,10 +146,11 @@ volcano_plot <- ggplot(global_models, aes(.data$beta, .data$neglog10_p)) +
   labs(
     title = "Exploratory C6-associated bulk expression context",
     subtitle = paste0(
-      "Nivolumab-treated ccRCC (n=181); adjusted for bulk T-cell score and trial"
+      "Nivolumab-treated ccRCC (n=181); adjusted for bulk T-cell score and trial; ",
+      "BH correction across all fitted genes"
     ),
     x = "Adjusted coefficient: C6-high versus C6-low",
-    y = expression(-log[10]("nominal p")), color = NULL
+    y = expression(-log[10]("BH-adjusted p")), color = NULL
   ) +
   theme_pub() +
   theme(legend.position = "top")

@@ -174,19 +174,40 @@ def clean(value: object) -> str:
 
 
 def as_float(value: object) -> float:
+    """Parse one numeric cell; only explicit missing values may become NaN."""
     if value is None:
         return math.nan
+    if isinstance(value, bool):
+        raise ValueError(f"Invalid numeric value: {value!r}")
     if isinstance(value, (int, float)):
-        return float(value)
+        try:
+            number = float(value)
+        except OverflowError as exc:
+            raise ValueError(
+                f"Numeric value is outside float range: {value!r}"
+            ) from exc
+        if math.isnan(number):
+            return math.nan
+        if not math.isfinite(number):
+            raise ValueError(f"Non-finite numeric value: {value!r}")
+        return number
     text = clean(value)
     if not text or text.upper() in {"NA", "N/A", "NAN", "NE"}:
         return math.nan
-    if "," in text and "." not in text:
-        text = text.replace(",", ".")
-    try:
-        return float(text)
-    except ValueError:
-        return math.nan
+    if "," in text:
+        raise ValueError(
+            "Ambiguous numeric value containing a comma; "
+            f"expected an ungrouped dot-decimal value: {text!r}"
+        )
+    if re.fullmatch(
+        r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?",
+        text,
+    ) is None:
+        raise ValueError(f"Invalid numeric value: {text!r}")
+    number = float(text)
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite numeric value: {text!r}")
+    return number
 
 
 def format_number(value: float) -> str:
