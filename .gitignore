@@ -1,0 +1,36 @@
+# Source archives and all sample-level derivatives are local-only.
+data/raw/
+data/cache/
+data/processed/
+data/analysis/*
+data/rnaseq/
+data/singlecell/
+data/depmap/
+data/project_sources/
+
+# The following CheckMate tables contain aggregate statistics only.
+!data/analysis/checkmate_c6_global_gene_models.tsv.gz
+!data/analysis/checkmate_c6_group_balance.tsv
+!data/analysis/checkmate_c6_aggregate_qc.json
+!data/analysis/depmap_s1b_eligible_models.tsv.gz
+!data/analysis/depmap_s1b_source_provenance.json
+
+# Local preparation records and temporary downloads.
+data/**/*.part
+data/**/*.tmp
+data/.*.prepare.lock
+data/**/*preparation_qc.json
+!data/analysis/checkmate_c6_aggregate_qc.json
+!data/experimental/experimental_preparation_qc.json
+!data/analysis/depmap_s1b_preparation_qc.json
+
+# Generated figures, tables and validation exports are local build products.
+figures/
+results/
+.cache/
+__pycache__/
+*.pyc
+.Rhistory
+.RData
+.Rproj.user/
+*.rds

@@ -1,0 +1,50 @@
+{
+  "contract_version": 1,
+  "derived_file": {
+    "columns": [
+      "ProfileID",
+      "ModelID",
+      "OncotreePrimaryDisease",
+      "RIPK3_log2_TPM_plus_1",
+      "NLRP3_log2_TPM_plus_1",
+      "RIPK3_below_threshold",
+      "NLRP3_below_threshold",
+      "threshold_category"
+    ],
+    "compression": "gzip level 9; mtime 0; no original filename",
+    "filename": "depmap_s1b_eligible_models.tsv.gz",
+    "rows": 1591,
+    "sha256": "368ad92b085a722d3984a5355bea3109d8e5a2b29ffe563c3fd284cf8970f354",
+    "size_bytes": 47514,
+    "sort_order": [
+      "ModelID"
+    ]
+  },
+  "expression_release": "DepMap Public 25Q2",
+  "expression_release_identity_status": "confirmed",
+  "model_release": null,
+  "model_release_identity_status": "unverified",
+  "population_rule": "is_default_entry == True; ModelType == Cell Line; non-empty OncotreePrimaryDisease != Non-Cancerous; finite RIPK3 and NLRP3",
+  "release_identity_note": "The expression matrix is DepMap Public 25Q2. Model.csv is separately checksum-pinned, but its release identity must be confirmed before a same-release claim is made.",
+  "release_pair_status": "unverified",
+  "same_release_pair": null,
+  "source_files": {
+    "expression_archive": {
+      "filename": "OmicsExpressionTPMLogp1HumanProteinCodingGenes.zip",
+      "sha256": "c44524c48e20f8c5c1263eb23cd55df77ceda62cfb5246babbe22cecc90c3da0",
+      "size_bytes": 249426032
+    },
+    "expression_member": {
+      "filename": "OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv",
+      "sha256": "90bfdbe5c44cbb8f822e655ba7f179f3033933116285b6b2f85153b2d3d17c75",
+      "size_bytes": 538420733
+    },
+    "model_metadata": {
+      "filename": "Model.csv",
+      "md5": "af4472ab734ea3aec974d992b504c7e5",
+      "sha256": "9dbb9de8805696c1345816ab07edd23fb4fd95e117739f3c5c3b1cf062c1233b",
+      "size_bytes": 699474
+    }
+  },
+  "tissue_origin_filter_applied": false
+}

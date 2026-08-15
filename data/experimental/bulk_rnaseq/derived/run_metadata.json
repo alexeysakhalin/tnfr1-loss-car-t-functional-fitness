@@ -1,0 +1,17 @@
+{
+  "export_filter": "none; every output contains the full 46,425-symbol universe",
+  "feature_level": "Gene_Symbol after deterministic sum over source Gene_ID",
+  "include_interaction": true,
+  "input_sha256": {
+    "gene_annotations.tsv.gz": "df62edc5ae7b8f1818d5c6ce3427177cd0aa303c22d5f199229efc9d0fffdbb6",
+    "gene_counts.tsv.gz": "9b3d97e4f1081d1b8bd54b795d5b01542240a47fc94284ead407853cdd26d6af",
+    "sample_metadata.tsv": "52631fe4cb515b381ff56d4141447405d0b9bf4441bb4ef1901c11017b9e9d27"
+  },
+  "n_cpus": 2,
+  "numpy": "2.5.2",
+  "output_commit_mode": "staged atomic directory rename",
+  "pandas": "3.0.5",
+  "prefilter": "all-zero features within each fitted sample subset only",
+  "pydeseq2": "0.5.4",
+  "python": "3.12.13"
+}

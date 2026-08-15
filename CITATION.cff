@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this analysis repository, please cite the accompanying manuscript."
+title: "Analysis code for tumor-cell TNFR1 loss and CAR-T functional fitness"
+type: software
+license: MIT
+authors:
+  - family-names: Petukhov
+    given-names: Alexey
+  - family-names: Levchuk
+    given-names: Ksenia
+  - family-names: Ilyassova
+    given-names: Bayansulu
+  - family-names: Tursymbek
+    given-names: Shynggys
+  - family-names: Silonov
+    given-names: Sergey
+  - family-names: Omelina
+    given-names: Evgeniya
+  - family-names: Pindyurin
+    given-names: Alexey
+  - family-names: Barlev
+    given-names: Nick A
+repository-code: "https://github.com/alexeysakhalin/bayansuluilyassova-car-t_bystander_resistance"

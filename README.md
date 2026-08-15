@@ -1,71 +1,127 @@
 # TNFR1 loss and CAR-T functional fitness: analysis repository
 
-This repository contains the analysis code accompanying the manuscript
-“Tumor cell TNFR1 loss attenuates inflammatory responsiveness and reduces
-CAR-T cell functional fitness in an antigen-retaining in vitro co-culture
-model.”
+This repository contains analysis code and version-controlled data products for
+the manuscript “Tumor cell TNFR1 loss attenuates inflammatory responsiveness
+and reduces CAR-T cell functional fitness in an antigen-retaining in vitro
+co-culture model.”
 
-The code is organized around two distinct evidence layers:
+The analyses cover tumor-cell bulk RNA-seq, targeted single-cell mRNA profiling,
+descriptive DepMap context and exploratory analyses of four published
+immune-checkpoint-blockade cohorts. The public cohorts are not CAR-T-treated
+cohorts and do not test a TNFR1-dependent clinical mechanism. Transferred C0-C9
+scores are bulk expression signatures rather than cell fractions or measured
+CAR-T phenotypes in patients.
 
-1. experimental bulk and targeted single-cell analyses from the in-vitro
-   HeLa–CAR-T system; and
-2. exploratory clinical-context analyses of four published immune-checkpoint
-   blockade cohorts.
+## Repository structure
 
-The public cohorts are not CAR-T-treated cohorts and are not used to validate a
-TNFR1-dependent clinical mechanism. Transferred C0–C9 scores are bulk
-expression signatures, not cell fractions or measured CAR-T phenotypes in
-patients.
-
-## Repository contents
-
-| Path | Purpose |
+| Path | Contents |
 |---|---|
-| `R/` | Figure-generating R scripts and shared validation helpers |
-| `scripts/` | Checksum-verified source acquisition and deterministic cohort preparation |
-| `validation/` | Independent Python recalculation of the primary CheckMate survival analyses |
-| `resources/` | Frozen C0–C9 marker definitions, curated display genes and identifier mappings |
-| `reference_results/` | Aggregate validation results without sample identifiers |
-| `data/source_manifest.tsv` | Source URL, DOI/accession, licence, expected filename, size and SHA-256 |
-| `tests/` | Repository-contract and numerical-regression tests |
+| `R/` | Figure-generating R scripts and shared plotting/validation functions |
+| `scripts/` | Source acquisition, deterministic table preparation and bulk RNA-seq modelling |
+| `validation/` | Independent CheckMate survival recalculation |
+| `resources/` | Frozen C0-C9 signatures, curated gene sets and identifier mappings |
+| `data/experimental/` | Version-controlled experimental analysis tables and provenance |
+| `data/analysis/` | Aggregate CheckMate results and the compact DepMap S1B derivative |
+| `data/source_manifest.tsv` | Public-source locations, licences, expected filenames, sizes and SHA-256 values |
+| `reference_results/` | Aggregate numerical reference results without sample identifiers |
+| `docs/` | Analysis details, figure map and complete input inventory |
+| `tests/` | Structural and numerical regression tests |
 
-Sample-level clinical and expression data are not version-controlled. Source
-files and locally generated sample-level tables are excluded by `.gitignore`.
-This avoids redistributing the Braun CheckMate supplement, which does not carry
-an open redistribution licence, and keeps one consistent policy across all
-four cohorts.
+The exact local-only inputs and their required filenames are listed in
+[`docs/REPRODUCIBILITY_INPUTS.md`](docs/REPRODUCIBILITY_INPUTS.md).
 
-## Clinical-context workflow
+## Software environment
 
-Python 3.12 and R 4.4 are used by the automated checks. Create a Python
-environment and install the pinned validation dependencies:
+The automated workflows use Python 3.12 and R 4.4.3. Install the Python
+dependencies from the repository root:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install --requirement requirements.txt
+python -m pip install --requirement requirements-bulk-rnaseq.txt
 ```
 
-Review the source inventory and obtain the required publisher files:
+`renv.lock` records the R environment used by the automated bulk RNA-seq and
+DepMap renderers. The targeted single-cell script additionally requires
+`Matrix`, `Seurat`, `dplyr`, `tidyr`, `tibble`, `patchwork`, `openxlsx`,
+`data.table`, `ggplot2` and `scales`. Clinical-context scripts declare their
+package requirements at the start of each file. Archive `sessionInfo()` with
+each final figure run.
+
+## Validation
+
+Run the lightweight repository checks with:
+
+```bash
+python -m py_compile scripts/*.py validation/*.py tests/*.py
+python -m unittest discover -s tests -v
+```
+
+GitHub Actions runs the same contracts, parses all R scripts and independently
+rebuilds the bulk RNA-seq and DepMap S1B figures. Figure artifacts include PNG,
+600-dpi LZW TIFF, numerical output contracts, source checksums and runtime
+provenance.
+
+## Bulk RNA-seq
+
+The tracked count matrix contains 46,427 Gene_ID features and 24 samples:
+WT and TNFR1-KO1, four treatment conditions and three independent experiments
+per genotype-condition combination. Source label `T6` maps to manuscript clone
+`TNFR1-KO1`. The three records displayed as `TRNAV-CAC` are summed only for the
+symbol-level models, yielding 46,425 unique symbols.
+
+Re-estimate the seven primary contrasts and three prespecified
+genotype-by-treatment interactions, then render Figures 1B, 1C, 2B and
+Supplementary Figure S2D:
+
+```bash
+python scripts/run_bulk_rnaseq_pydeseq2.py \
+  --input-dir data/experimental/bulk_rnaseq \
+  --output-dir results/bulk_rnaseq \
+  --include-interaction \
+  --n-cpus 2
+Rscript R/render_bulk_rnaseq_figures.R
+```
+
+PyDESeq2 v0.5.4 fits each primary contrast as a separate six-sample model.
+Complete 46,425-symbol result universes, including explicitly non-estimable
+rows, are passed to the figure scripts. The within-treatment TNFR1-KO1-versus-WT
+contrasts used in Figure 2B are distinct from the formal interaction tests.
+
+The validated complete adapters are also version-controlled under
+`data/experimental/bulk_rnaseq/derived/`, so the R figure scripts can be run
+directly from a clean clone. The display contracts verify panel order, gene
+universe, missingness, thresholds, Venn membership, label selection, image
+dimensions and TIFF compression.
+
+## Targeted single-cell mRNA profiling
+
+`R/05_figure_4_AB_suppl_S5A.R` reads the four tracked `CD3+ cells` matrices:
+WT (3,743 cells), KO1 (2,475), KO2 (1,831) and the repeated-stimulation dataset
+(5,662). Each matrix contains 259 targeted genes. These data must be described
+as targeted single-cell mRNA profiling rather than whole-transcriptome
+single-cell RNA-seq.
+
+```bash
+Rscript R/05_figure_4_AB_suppl_S5A.R
+```
+
+Before figure release, review the exported marker profiles against every manual
+cluster label and archive the before/after QC counts, marker tables and
+`sessionInfo()`.
+
+## Clinical-context analyses
+
+List the required publisher files and prepare the local analysis tables:
 
 ```bash
 python scripts/fetch_public_sources.py --list
-```
-
-The detailed acquisition commands, licences, local filenames and schemas are
-documented in [`data/README.md`](data/README.md). Each input is rejected unless
-its byte size and SHA-256 match `data/source_manifest.tsv`.
-
-After the verified inputs have been placed under `data/raw/`, prepare the local
-analysis tables and aggregate CheckMate model results:
-
-```bash
 python scripts/prepare_open_cohort_analysis_tables.py --include-checkmate-aggregates
 ```
 
-No SQLite database or monolithic R data object is required. The clinical
-figures can then be generated in manuscript order:
+Then run the clinical-context scripts in manuscript order:
 
 ```bash
 Rscript R/01_validate_analysis_tables.R
@@ -78,8 +134,14 @@ Rscript R/10_figure_5G.R
 Rscript R/12_supplementary_S6B_S6F.R
 ```
 
-The independent CheckMate recalculation accepts either the official combined
-Braun workbook or the verified split S1/S4 files:
+The CheckMate analyses use the 181 nivolumab-treated RNA-profiled tumors
+(CM-009, 16; CM-010, 45; CM-025, 120), not the pooled 311-sample dataset.
+`OS_CNSR` and `PFS_CNSR` are retained as supplied: 1 denotes an observed event
+and 0 denotes censoring. The C6 overall-survival comparison is nominal and
+exploratory; its multiplicity-adjusted result is not significant.
+
+The independent recalculation accepts the official combined Braun workbook or
+the checksum-verified split S1/S4 files:
 
 ```bash
 python validation/recalculate_checkmate_survival.py \
@@ -87,63 +149,44 @@ python validation/recalculate_checkmate_survival.py \
   --output-dir results/checkmate_validation
 ```
 
-## Prespecified CheckMate population and event coding
+Patient-level clinical and expression data remain local and are excluded by
+`.gitignore`. This preserves the source access and redistribution conditions;
+only aggregate, non-identifying validation results are version-controlled.
 
-The publisher workbook contains 311 RNA-profiled tumors: 181 from the
-nivolumab arm and 130 from the everolimus arm. Clinical-context analyses in the
-manuscript use only the 181 nivolumab-treated tumors (CM-009, 16; CM-010, 45;
-CM-025, 120). `OS_CNSR` and `PFS_CNSR` are retained as supplied: 1 denotes an
-observed event and 0 denotes censoring.
+## DepMap Supplementary Figure S1B
 
-The cross-cohort bulk T-cell score uses the five genes measured in every
-cohort: `CD2`, `CD3D`, `CD3E`, `CD8A` and `CD8B`.
+The tracked compact derivative contains 1,591 eligible cell-line models joined
+by `ModelID`. At the prespecified threshold of <0.5 log2(TPM+1), RIPK3 is below
+threshold in 1,003/1,591 (63.0%), NLRP3 in 1,172/1,591 (73.7%) and both in
+749/1,591 (47.1%). These are descriptive frequencies in the checksum-pinned
+source pair, not cancer prevalence or evidence of pathway competence.
 
-The C6 median-split overall-survival comparison is nominal and exploratory:
-trial-stratified Cox HR 1.504 (95% CI 1.050–2.154), Cox *p*=0.0259 and
-BH-adjusted Cox *p*=0.166 across ten signatures. The descriptive log-rank
-*p*=0.0246 has BH-adjusted *p*=0.208. No C6 progression-free-survival
-association was detected. These results do not support a predictive biomarker
-claim.
-
-## Experimental inputs
-
-Scripts for Figures 1, 2, 4 and the repeated-stimulation component of Figure 5
-require project RNA-seq and targeted single-cell input files that are not part
-of the patient-cohort archive. Their required local paths are listed in
-[`docs/FIGURE_MAP.md`](docs/FIGURE_MAP.md). The scripts fail explicitly when a
-required input or package is missing.
-
-Supplementary Figure S1B is intentionally release-locked: it must not be used
-until the exact DepMap Public release, Figshare DOI, download date, checksums
-and one-default-profile-per-human-cell-line filtering are supplied. The
-repository does not retain the earlier unverified DepMap percentages.
-
-## Validation
-
-Run the lightweight checks locally with:
+Render the panel from a clean clone with:
 
 ```bash
-python -m py_compile scripts/*.py validation/*.py tests/*.py
-python -m unittest discover -s tests -v
+Rscript R/11_supplementary_1B.R
 ```
 
-GitHub Actions independently parses every R script and runs the Python
-contract tests on each pull request. Aggregate reference results are retained
-to detect changes in cohort composition, event coding, the frozen 20-gene
-membership of each C0-C9 signature or multiplicity adjustment.
+The expression matrix is identified as DepMap Public 25Q2. The exact quarterly
+release of the supplied `Model.csv` could not be verified and is disclosed as
+such in the machine-readable provenance and in
+[`docs/DEPMAP_S1B.md`](docs/DEPMAP_S1B.md).
 
-## Source studies
+## Figure map and experimental scope
 
-The clinical-context analyses use processed data accompanying:
+[`docs/FIGURE_MAP.md`](docs/FIGURE_MAP.md) maps each manuscript panel to its
+script, inputs and output filename. Supplementary Figure S3 is a flow-cytometry
+experiment and is outside this transcriptomic repository; its final analysis
+requires the raw FCS files, compensation/gating record, denominator, replicate
+map and prespecified contrasts.
 
-- Mariathasan et al., *Nature* (2018),
-  [doi:10.1038/nature25501](https://doi.org/10.1038/nature25501);
-- Liu et al., *Nature Medicine* (2019),
-  [doi:10.1038/s41591-019-0654-5](https://doi.org/10.1038/s41591-019-0654-5);
-- Braun et al., *Nature Medicine* (2020),
-  [doi:10.1038/s41591-020-0839-y](https://doi.org/10.1038/s41591-020-0839-y);
-- Ravi et al., *Nature Genetics* (2023),
-  [doi:10.1038/s41588-023-01355-5](https://doi.org/10.1038/s41588-023-01355-5).
+## Licence and citation
 
-Exact publisher URLs, accessions, licences, expected byte sizes and SHA-256
+Repository code is available under the MIT License. Project-derived processed
+data and figures are available under CC BY 4.0; third-party data retain their
+source terms. See `LICENSE`, `DATA_LICENSE.md` and `CITATION.cff`.
+
+The clinical-context analyses use processed data accompanying Mariathasan et
+al. (2018), Liu et al. (2019), Braun et al. (2020) and Ravi et al. (2023).
+Exact citations, source URLs, accessions, licences, expected sizes and SHA-256
 checksums are recorded in `data/source_manifest.tsv`.
