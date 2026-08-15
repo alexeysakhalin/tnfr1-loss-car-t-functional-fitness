@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
+import importlib.util
 import json
 import math
 import subprocess
@@ -373,6 +374,119 @@ class RepositoryContractTests(unittest.TestCase):
             float(row["logrank_BH_10_states"]), 0.208407, places=6
         )
         self.assertGreater(float(row["cox_BH_10_states"]), 0.05)
+
+    def test_figure_5e_s6d_s6e_selection_is_unambiguous(self) -> None:
+        script = (
+            ROOT / "R" / "08_figure_5E_S6D_S6E.R"
+        ).read_text(encoding="utf-8")
+        normalized = " ".join(script.split())
+        endpoint_selector = ".data$endpoint == .env$endpoint"
+        signature_selector = ".data$signature == .env$cluster"
+        guard = "if (nrow(r) != 1L)"
+        subtitle = "subtitle <- sprintf("
+        self.assertIn(endpoint_selector, normalized)
+        self.assertIn(signature_selector, normalized)
+        self.assertNotIn(".data$endpoint == endpoint", normalized)
+        self.assertNotIn(".data$signature == cluster", normalized)
+        self.assertIn(guard, normalized)
+        self.assertLess(normalized.index(endpoint_selector), normalized.index(guard))
+        self.assertLess(normalized.index(signature_selector), normalized.index(guard))
+        self.assertLess(normalized.index(guard), normalized.index(subtitle))
+
+    def test_open_cohort_numeric_parser_is_strict(self) -> None:
+        path = ROOT / "scripts" / "prepare_open_cohort_analysis_tables.py"
+        spec = importlib.util.spec_from_file_location(
+            "prepare_open_cohort_analysis_tables_for_test", path
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        for value in (None, "", " ", "NA", "n/a", "NaN", "NE", float("nan")):
+            with self.subTest(missing=value):
+                self.assertTrue(math.isnan(module.as_float(value)))
+
+        for value, expected in (
+            (0, 0.0),
+            (12345, 12345.0),
+            (12.345, 12.345),
+            ("12.345", 12.345),
+            (" .5 ", 0.5),
+            ("-2.5e+3", -2500.0),
+        ):
+            with self.subTest(valid=value):
+                self.assertEqual(module.as_float(value), expected)
+
+        for value in ("12,345", "1,234", "1,234.5", "0,5"):
+            with self.subTest(ambiguous=value):
+                with self.assertRaisesRegex(ValueError, "comma"):
+                    module.as_float(value)
+
+        for value in (
+            "not-a-number",
+            "1_000",
+            "inf",
+            "-Infinity",
+            "1e9999",
+            True,
+            float("inf"),
+        ):
+            with self.subTest(invalid=value):
+                with self.assertRaises(ValueError):
+                    module.as_float(value)
+
+    def test_r05_publishes_outputs_only_after_marker_guards(self) -> None:
+        source = (ROOT / "R" / "05_figure_4_AB_suppl_S5A.R").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('FINAL_FIG_DIR <- "figures"', source)
+        self.assertIn('FIG_DIR <- tempfile(pattern = "R05-staging-"', source)
+        self.assertNotIn('\nFIG_DIR <- "figures"\n', source)
+        invocation = "promote_staged_outputs(FIG_DIR, FINAL_FIG_DIR)"
+        self.assertEqual(source.count(invocation), 1)
+        last_guard = source.rfind(
+            'stop("TCR marker table is empty; cluster annotations cannot be '
+            'release-validated.")'
+        )
+        promotion = source.rfind(invocation)
+        self.assertGreater(last_guard, -1)
+        self.assertGreater(promotion, last_guard)
+        self.assertGreater(promotion, source.rfind("saveRDS(obj"))
+
+    def test_figure_5f_displays_the_adjusted_gene_family(self) -> None:
+        source = (ROOT / "R" / "09_figure_5F_S6G.R").read_text(encoding="utf-8")
+        normalized = " ".join(source.split())
+        self.assertIn(
+            "neglog10_BH_p = -log10(pmax(.data$BH_p, "
+            ".Machine$double.xmin))",
+            normalized,
+        )
+        self.assertIn("aes(.data$beta, .data$neglog10_BH_p)", normalized)
+        self.assertIn('expression(-log[10]("BH-adjusted p"))', source)
+        self.assertNotIn('expression(-log[10]("nominal p"))', source)
+
+    def test_bulk_p_value_floor_uses_zero_absolute_tolerance(self) -> None:
+        source = (
+            ROOT / "scripts" / "verify_bulk_figure_outputs.py"
+        ).read_text(encoding="utf-8")
+        normalized = " ".join(source.split())
+        self.assertIn(
+            'abs_tol=0.0 if field == "adjusted_p_value_floor" else 1e-12',
+            normalized,
+        )
+
+    def test_scientific_workflows_validate_relevant_pushes_to_main(self) -> None:
+        for relative_path in (
+            ".github/workflows/bulk-rnaseq.yml",
+            ".github/workflows/depmap-s1b.yml",
+        ):
+            with self.subTest(workflow=relative_path):
+                source = (ROOT / relative_path).read_text(encoding="utf-8")
+                self.assertIn(
+                    "  push:\n    branches: [main]\n    paths:\n",
+                    source,
+                )
 
     def test_experimental_analysis_tables(self) -> None:
         manifest_path = ROOT / "data" / "experimental" / "experimental_data_manifest.tsv"

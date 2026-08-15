@@ -18,6 +18,23 @@ on:
       - "R/04_figure_2_B_suppl_S2D.R"
       - "R/bulk_rnaseq_figure_helpers.R"
       - "R/render_bulk_rnaseq_figures.R"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bulk-rnaseq.yml"
+      - "data/experimental/bulk_rnaseq/**"
+      - "requirements-bulk-rnaseq.in"
+      - "requirements-bulk-rnaseq.txt"
+      - "scripts/run_bulk_rnaseq_pydeseq2.py"
+      - "scripts/verify_bulk_figure_outputs.py"
+      - "scripts/verify_bulk_rnaseq_release.py"
+      - "scripts/write_runtime_provenance.py"
+      - "tests/test_verify_bulk_rnaseq_release.py"
+      - "renv.lock"
+      - "R/03_figure_1_B_C.R"
+      - "R/04_figure_2_B_suppl_S2D.R"
+      - "R/bulk_rnaseq_figure_helpers.R"
+      - "R/render_bulk_rnaseq_figures.R"
 
 permissions:
   contents: read

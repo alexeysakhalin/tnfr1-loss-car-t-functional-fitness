@@ -32,20 +32,34 @@ The exact local-only inputs and their required filenames are listed in
 
 ## Software environment
 
-The automated workflows use Python 3.12 and R 4.4.3. Install the Python
-dependencies from the repository root:
+The automated workflows use Python 3.12 and R 4.4.3. The core and bulk
+RNA-seq requirement files pin different dependency versions, so install them
+in separate environments from the repository root.
+
+Core validation and open-cohort preparation:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .venv-analysis
+source .venv-analysis/bin/activate
 python -m pip install --upgrade pip
 python -m pip install --requirement requirements.txt
+deactivate
+```
+
+Bulk RNA-seq reconstruction:
+
+```bash
+python -m venv .venv-bulk
+source .venv-bulk/bin/activate
+python -m pip install --upgrade pip
 python -m pip install --requirement requirements-bulk-rnaseq.txt
+deactivate
 ```
 
 `renv.lock` records the R environment used by the automated bulk RNA-seq and
-DepMap renderers. The targeted single-cell script additionally requires
-`Matrix`, `Seurat`, `dplyr`, `tidyr`, `tibble`, `patchwork`, `openxlsx`,
+DepMap renderers; it is not a complete lock for the single-cell or clinical
+scripts. The targeted single-cell script additionally requires `Matrix`,
+`Seurat`, `dplyr`, `tidyr`, `tibble`, `patchwork`, `openxlsx`,
 `data.table`, `ggplot2` and `scales`. Clinical-context scripts declare their
 package requirements at the start of each file. Archive `sessionInfo()` with
 each final figure run.

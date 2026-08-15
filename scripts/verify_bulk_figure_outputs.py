@@ -176,9 +176,15 @@ def expected_contract_rows(spec: FigureSpec) -> list[dict[str, object]]:
     return expected
 
 
-def assert_close(observed: str, expected: float, context: str) -> None:
+def assert_close(
+    observed: str,
+    expected: float,
+    context: str,
+    *,
+    abs_tol: float = 1e-12,
+) -> None:
     value = float(observed)
-    if not math.isclose(value, expected, rel_tol=1e-10, abs_tol=1e-12):
+    if not math.isclose(value, expected, rel_tol=1e-10, abs_tol=abs_tol):
         raise ValueError(f"{context}: observed {value!r}, expected {expected!r}")
 
 
@@ -218,7 +224,12 @@ def verify_contract(spec: FigureSpec) -> None:
                     f"expected {wanted[field]!r}"
                 )
         for field in numeric_fields:
-            assert_close(actual[field], float(wanted[field]), f"{context}, {field}")
+            assert_close(
+                actual[field],
+                float(wanted[field]),
+                f"{context}, {field}",
+                abs_tol=0.0 if field == "adjusted_p_value_floor" else 1e-12,
+            )
         for field in text_fields:
             if actual[field] != wanted[field]:
                 raise ValueError(

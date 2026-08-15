@@ -96,10 +96,59 @@ FILES <- c(
 )
 
 # -----------------------------
-# Output directory
+# Output directory. All outputs from this script are staged and are exposed
+# only after both marker/annotation guards have passed.
 # -----------------------------
-FIG_DIR <- "figures"
-dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
+FINAL_FIG_DIR <- "figures"
+FIG_DIR <- tempfile(pattern = "R05-staging-", tmpdir = tempdir())
+if (!dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)) {
+  stop("Could not create the R/05 staging directory: ", FIG_DIR)
+}
+
+promote_staged_outputs <- function(staging_dir, final_dir) {
+  staged_paths <- list.files(
+    staging_dir,
+    all.files = TRUE,
+    full.names = TRUE,
+    recursive = TRUE,
+    include.dirs = FALSE,
+    no.. = TRUE
+  )
+  if (!length(staged_paths)) stop("R/05 produced no staged outputs.")
+
+  relative_paths <- substring(staged_paths, nchar(staging_dir) + 2L)
+  for (index in seq_along(staged_paths)) {
+    target_path <- file.path(final_dir, relative_paths[[index]])
+    dir.create(dirname(target_path), recursive = TRUE, showWarnings = FALSE)
+    incoming_path <- tempfile(
+      pattern = paste0(".", basename(target_path), ".incoming-"),
+      tmpdir = dirname(target_path)
+    )
+    copied <- file.copy(
+      staged_paths[[index]], incoming_path,
+      overwrite = FALSE, copy.mode = TRUE, copy.date = TRUE
+    )
+    if (!copied || !identical(
+      unname(tools::md5sum(staged_paths[[index]])),
+      unname(tools::md5sum(incoming_path))
+    )) {
+      unlink(incoming_path, force = TRUE)
+      stop("Could not stage a verified copy for publication: ", target_path)
+    }
+
+    # Atomic replacement on POSIX. file.rename() cannot replace an existing
+    # file on some Windows installations, so use a guarded copy fallback there.
+    if (!file.rename(incoming_path, target_path)) {
+      copied <- file.copy(
+        incoming_path, target_path,
+        overwrite = TRUE, copy.mode = TRUE, copy.date = TRUE
+      )
+      unlink(incoming_path, force = TRUE)
+      if (!copied) stop("Could not publish validated output: ", target_path)
+    }
+  }
+  invisible(relative_paths)
+}
 
 QC_Q_FEATURE_LOW  <- 0.02
 QC_Q_FEATURE_HIGH <- 0.98
@@ -952,9 +1001,8 @@ FILE_TCR <- file.path(
 SOURCE_SUBSET <- "CD3+ cells"
 
 # -----------------------------
-# Output directory
+# Continue using the run-level staging directory initialized above.
 # -----------------------------
-FIG_DIR <- "figures"
 
 QC_Q_FEATURE_LOW  <- 0.02
 QC_Q_FEATURE_HIGH <- 0.98
@@ -1455,8 +1503,13 @@ if (nrow(markers) > 0) {
 saveRDS(obj, file.path(FIG_DIR, "TCR_seurat_object.rds"))
 writeLines(capture.output(sessionInfo()), file.path(FIG_DIR, "sessionInfo_R05.txt"))
 
+# Both marker guards have now passed. Only validated outputs become visible in
+# the stable publication directory.
+promote_staged_outputs(FIG_DIR, FINAL_FIG_DIR)
+unlink(FIG_DIR, recursive = TRUE, force = TRUE)
+
 # -----------------------------
 # Done
 message("DONE.")
 message("Source subset: ", SOURCE_SUBSET)
-message("All outputs saved in: ", FIG_DIR)
+message("All outputs saved in: ", FINAL_FIG_DIR)

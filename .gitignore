@@ -28,6 +28,7 @@ data/**/*preparation_qc.json
 figures/
 results/
 .cache/
+.venv*/
 __pycache__/
 *.pyc
 .Rhistory
