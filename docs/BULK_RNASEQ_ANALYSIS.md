@@ -113,14 +113,39 @@ and as an explicitly named `fdr05` view. The latter is a convenience view and
 is not an acceptable input for reconstructing a volcano plot's non-significant
 background.
 
-`R/03_figure_1_B_C.R` must read
-`results/bulk_rnaseq/figure_inputs/figure_1b_1c_wt_cytokine_contrasts.unfiltered.tsv.gz`.
-`R/04_figure_2_B_suppl_S2D.R` must read
-`results/bulk_rnaseq/figure_inputs/figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz`.
-The R scripts must use the snake-case effect columns declared above; the
-legacy workbooks and their historical column aliases must not be mixed with
-these regenerated adapters.
+The manuscript figure scripts read the validated adapters committed under
+`data/experimental/bulk_rnaseq/derived/`. A count-level rebuild first writes
+new adapters under `results/bulk_rnaseq/figure_inputs/`; the release verifier
+must accept that rebuild before the committed adapters are used to render the
+figures. The R scripts use the snake-case effect columns declared above; the
+legacy workbooks and their historical column aliases are not mixed with these
+adapters.
 
 `requirements-bulk-rnaseq.txt` records the complete exact Python 3.12.13
-environment used for the release run. The byte-identical runtime snapshot is
-also retained as `environment.freeze.txt` with the derived results.
+environment used for the release run. The package snapshot is retained as
+`environment.freeze.txt` with the derived results. Each CI rebuild also writes
+`runtime_provenance.json`, which records the operating platform, Python and
+zlib versions, NumPy build configuration, and numerical-library thread
+environment. Runtime provenance is diagnostic and is not required to match a
+different host.
+
+## Release-outcome check
+
+`scripts/verify_bulk_rnaseq_release.py` keeps schema, semantic keys and row
+order, text and integer fields, `NA` masks, analysis metadata, and manifest
+provenance exact. The generated manifest hashes must match the generated files.
+For every release table, the base-mean and fold-change threshold masks and the
+combined DEG categories (`baseMean >= 30`, adjusted p-value `< 0.05`, and
+log2 fold change `> 1` or `< -1`) must be identical. Figure 1C and
+Supplementary Figure S2D Venn membership and the significance/direction calls
+for ICAM1, MLKL, GSDME, and IRF1 in the interaction analyses must also be
+identical. Both the regenerated and committed tables are independently checked
+for the Wald identity `stat = log2FoldChange / lfcSE`. For the 21 genes labelled
+in the volcano plots, regenerated log2 fold changes must be within an absolute
+difference of `0.001` of the committed value wherever estimable.
+
+Small changes in numerically unstable model tails can occur across BLAS and
+libm implementations even with the locked package environment. Raw numeric
+deltas and standalone adjusted-p-value threshold flips are therefore recorded
+in `release_comparison_report.json`; they do not fail the rebuild unless one of
+the exact scientific-outcome contracts above changes.

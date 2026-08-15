@@ -115,13 +115,16 @@ The two complete figure-input adapters and the three complete interaction
 tables from the validated release run are version-controlled under
 `data/experimental/bulk_rnaseq/derived/`. Consequently, R03 and R04 can render
 the bulk panels directly from a clean clone. The count-level workflow rebuilds
-these files and the automated workflow requires byte-identical release
-artifacts before rendering.
+these files and verifies exact structural, missingness, threshold-category,
+Venn-membership and prespecified interaction-gene outcomes before rendering
+from the committed release adapters. Raw cross-platform numeric deltas remain
+available in the comparison report; the displayed volcano-label genes have an
+additional absolute log2-fold-change reproducibility bound of `0.001`.
 
 The `Rebuild bulk RNA-seq figures` GitHub Actions workflow performs the pinned
 count-to-DE run, checks all complete result exports, renders 600-dpi PNG/TIFF
 panels with R 4.4.3 and stores both result and figure artifacts together with
-the runtime records.
+the comparison report and runtime provenance.
 
 The targeted single-cell inputs use the `CD3+ cells` sheets: WT, 3,743 cells;
 KO1, 2,475; KO2, 1,831; and the repeated-stimulation dataset, 5,662. These are
