@@ -14,16 +14,19 @@
     "compression": "gzip level 9; mtime 0; no original filename",
     "filename": "depmap_s1b_eligible_models.tsv.gz",
     "rows": 1591,
-    "sha256": "368ad92b085a722d3984a5355bea3109d8e5a2b29ffe563c3fd284cf8970f354",
-    "size_bytes": 47514,
+    "sha256": "34e8b46cca3c7a4bd20db518affcc99e9614b7ecd7cdf0112be5271e76ad2529",
+    "size_bytes": 40212,
     "sort_order": [
       "ModelID"
     ]
   },
   "expression_qc": {
+    "default_entry_filter_applied": false,
     "default_profile_rows": 1684,
-    "nondefault_profile_rows": 55,
-    "source_profile_rows": 1739,
+    "model_id_source_column": "first unnamed column",
+    "nondefault_profile_rows": 0,
+    "profile_id_source_column": "first unnamed column",
+    "source_profile_rows": 1684,
     "unique_default_model_ids": 1684,
     "unique_default_profile_ids": 1684
   },
@@ -44,14 +47,14 @@
   },
   "model_qc": {
     "model_type_counts": {
-      "Cell Line": 2108,
+      "Cell Line": 2092,
       "Organoid": 24
     },
-    "non_cancerous_rows": 151,
-    "rows": 2132,
+    "non_cancerous_rows": 145,
+    "rows": 2116,
     "tissue_origin_filter_applied": false,
     "tissue_origin_nonempty_rows": 0,
     "tissue_origin_present": true,
-    "unique_model_ids": 2132
+    "unique_model_ids": 2116
   }
 }
