@@ -17,4 +17,14 @@ Every contrast retains all 46,425 gene symbols. All-zero features have
 filter was applied before export. `analysis_manifest.tsv`,
 `run_metadata.json`, `environment.freeze.txt` and `SHA256SUMS` record the
 validated release run. The automated rebuild compares regenerated outputs to
-this snapshot before rendering the figures.
+this snapshot before rendering the figures. Semantic identifiers, annotations,
+integer counts, missing-value locations, table order and the figure/inference
+threshold classifications are required to match exactly. Floating-point model
+columns other than p-values use `rtol=1e-6` and `atol=1e-8`; p-values use a
+maximum absolute difference of `1e-4` after clipping to `[1e-300, 1]` and
+applying `-log10`. These bounds accommodate small BLAS/libm variation across
+platforms while rejecting scientifically material drift across the full
+p-value range. Output SHA-256 values are validated against each regenerated
+file but are excluded from the cross-platform manifest comparison; run metadata
+and the complete environment freeze remain exact. CI preserves a JSON
+comparison report and the regenerated results even when verification fails.

@@ -9,6 +9,7 @@ on:
       - "requirements-bulk-rnaseq.in"
       - "requirements-bulk-rnaseq.txt"
       - "scripts/run_bulk_rnaseq_pydeseq2.py"
+      - "scripts/verify_bulk_rnaseq_release.py"
       - "R/03_figure_1_B_C.R"
       - "R/04_figure_2_B_suppl_S2D.R"
       - "R/bulk_rnaseq_figure_helpers.R"
@@ -39,52 +40,13 @@ jobs:
           --include-interaction
           --n-cpus 2
       - name: Verify complete result exports
-        run: |
-          python - <<'PY'
-          import gzip
-          import json
-          from pathlib import Path
-
-          import pandas as pd
-
-          root = Path("results/bulk_rnaseq")
-          manifest = pd.read_csv(root / "analysis_manifest.tsv", sep="\t")
-          if len(manifest) != 10 or manifest["analysis_id"].duplicated().any():
-              raise SystemExit("Expected ten unique primary/interaction analyses")
-          for filename in manifest["output_file"]:
-              path = root / filename
-              with gzip.open(path, "rt", encoding="utf-8") as handle:
-                  header = handle.readline().rstrip("\n").split("\t")
-                  rows = sum(1 for _ in handle)
-              if rows != 46_425 or "Gene_Symbol" not in header:
-                  raise SystemExit(f"Unexpected unfiltered result contract: {path}")
-          metadata = json.loads((root / "run_metadata.json").read_text())
-          if metadata["pydeseq2"] != "0.5.4" or not metadata["include_interaction"]:
-              raise SystemExit("Unexpected PyDESeq2 runtime metadata")
-          release = Path("data/experimental/bulk_rnaseq/derived")
-          release_pairs = {
-              root / "figure_inputs/figure_1b_1c_wt_cytokine_contrasts.unfiltered.tsv.gz":
-                  release / "figure_1b_1c_wt_cytokine_contrasts.unfiltered.tsv.gz",
-              root / "figure_inputs/figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz":
-                  release / "figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz",
-              root / "interaction_TNFR1_KO1_vs_WT_IFNG_vs_control.unfiltered.tsv.gz":
-                  release / "interaction_TNFR1_KO1_vs_WT_IFNG_vs_control.unfiltered.tsv.gz",
-              root / "interaction_TNFR1_KO1_vs_WT_TNF_vs_control.unfiltered.tsv.gz":
-                  release / "interaction_TNFR1_KO1_vs_WT_TNF_vs_control.unfiltered.tsv.gz",
-              root / "interaction_TNFR1_KO1_vs_WT_TNF_IFNG_vs_control.unfiltered.tsv.gz":
-                  release / "interaction_TNFR1_KO1_vs_WT_TNF_IFNG_vs_control.unfiltered.tsv.gz",
-              root / "analysis_manifest.tsv": release / "analysis_manifest.tsv",
-              root / "run_metadata.json": release / "run_metadata.json",
-              root / "environment.freeze.txt": release / "environment.freeze.txt",
-          }
-          for generated, committed in release_pairs.items():
-              if generated.read_bytes() != committed.read_bytes():
-                  raise SystemExit(
-                      f"Regenerated output differs from the validated release: {generated}"
-                  )
-          print("BULK_RNASEQ_RESULTS_OK")
-          PY
-      - name: Upload complete DE results
+        run: >-
+          python scripts/verify_bulk_rnaseq_release.py
+          --generated-dir results/bulk_rnaseq
+          --release-dir data/experimental/bulk_rnaseq/derived
+          --report results/bulk_rnaseq/release_comparison_report.json
+      - name: Upload complete DE results and comparison report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bulk-rnaseq-results
