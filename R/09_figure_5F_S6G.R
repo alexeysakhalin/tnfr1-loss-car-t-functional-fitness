@@ -139,14 +139,17 @@ volcano_plot <- ggplot(global_models, aes(.data$beta, .data$neglog10_BH_p)) +
   ggrepel::geom_text_repel(
     data = curated_statistics,
     aes(label = .data$gene, color = .data$block),
-    size = 3.2, max.overlaps = Inf, min.segment.length = 0,
-    box.padding = 0.35, show.legend = FALSE
+    size = 3.0, max.overlaps = Inf, min.segment.length = 0,
+    box.padding = 0.55, point.padding = 0.25,
+    force = 1.5, force_pull = 0.4, max.time = 2,
+    seed = 20260815, segment.alpha = 0.7,
+    show.legend = FALSE
   ) +
   scale_color_manual(values = block_colors) +
   labs(
     title = "Exploratory C6-associated bulk expression context",
     subtitle = paste0(
-      "Nivolumab-treated ccRCC (n=181); adjusted for bulk T-cell score and trial; ",
+      "Nivolumab-treated ccRCC (n = 181); adjusted for bulk T-cell score and trial\n",
       "BH correction across all fitted genes"
     ),
     x = "Adjusted coefficient: C6-high versus C6-low",
@@ -158,7 +161,7 @@ volcano_plot <- ggplot(global_models, aes(.data$beta, .data$neglog10_BH_p)) +
 save_ggplot_pair(
   volcano_plot,
   file.path(figure_dir, "Figure_5F_C6_adjusted_gene_level_volcano.png"),
-  width = 9, height = 6.5
+  width = 9.5, height = 6.7
 )
 
 # S6G uses the two-group aggregate summary from the same 181-sample model.
@@ -219,7 +222,7 @@ balance_plot <- ggplot(
   labs(
     title = "Residualized C6 group balance",
     subtitle = sprintf(
-      "Mean +/- SD; Welch p=%.3g; descriptive balance check", welch_values
+    "Mean +/- SD; Welch p = %.3g\nDescriptive balance check", welch_values
     ),
     x = "Adjusted C6 group", y = "Bulk T-cell expression score (z)"
   ) +
@@ -229,7 +232,7 @@ balance_plot <- ggplot(
 save_ggplot_pair(
   balance_plot,
   file.path(figure_dir, "Supplementary_Figure_S6G_C6_group_balance.png"),
-  width = 5.5, height = 5
+  width = 5.8, height = 5.2
 )
 
 writeLines(capture.output(sessionInfo()), file.path(output_dir, "sessionInfo.txt"))

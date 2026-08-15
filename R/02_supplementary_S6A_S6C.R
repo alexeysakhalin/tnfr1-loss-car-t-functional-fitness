@@ -73,6 +73,13 @@ plot_receptor_distribution <- function(gene, filename) {
   unit_labels <- plot_data |>
     distinct(.data$cohort_label, .data$expression_unit) |>
     mutate(label = gsub("_", " ", .data$expression_unit, fixed = TRUE))
+  facet_labels <- setNames(
+    paste0(
+      as.character(unit_labels$cohort_label),
+      "\n(", unit_labels$label, ")"
+    ),
+    as.character(unit_labels$cohort_label)
+  )
 
   plot_object <- ggplot(
     plot_data,
@@ -89,13 +96,10 @@ plot_receptor_distribution <- function(gene, filename) {
       linetype = "dashed", linewidth = 1, show.legend = FALSE,
       inherit.aes = FALSE
     ) +
-    geom_text(
-      data = unit_labels,
-      aes(x = -Inf, y = -Inf, label = .data$label),
-      inherit.aes = FALSE, hjust = -0.05, vjust = -0.2,
-      size = 4, fontface = "bold"
+    facet_wrap(
+      ~ cohort_label, scales = "free", nrow = 1,
+      labeller = as_labeller(facet_labels)
     ) +
-    facet_wrap(~ cohort_label, scales = "free", nrow = 1) +
     scale_fill_manual(values = cohort_colors) +
     scale_color_manual(values = cohort_colors) +
     labs(
@@ -104,7 +108,10 @@ plot_receptor_distribution <- function(gene, filename) {
     ) +
     coord_cartesian(clip = "off") +
     theme_pub() +
-    theme(legend.position = "none")
+    theme(
+      legend.position = "none",
+      strip.text = element_text(lineheight = 0.95)
+    )
 
   save_ggplot_pair(
     plot_object, file.path(figure_dir, filename), width = 14, height = 4.7
@@ -190,15 +197,17 @@ peak_plot <- ggplot(
     linetype = "dashed", linewidth = 1.1, show.legend = FALSE,
     inherit.aes = FALSE
   ) +
-  scale_fill_manual(values = peak_colors) +
-  scale_color_manual(values = peak_colors) +
+    scale_fill_manual(name = "Peak group", values = peak_colors) +
+    scale_color_manual(name = "Peak group", values = peak_colors) +
   labs(
     title = "Melanoma: visually defined TNFRSF1A peaks",
     x = paste0(
       "TNFRSF1A expression (",
       gsub("_", " ", liu_units[[1]], fixed = TRUE), ")"
     ),
-    y = "Density"
+    y = "Density",
+    fill = "Peak group",
+    color = "Peak group"
   ) +
   theme_pub()
 
@@ -228,27 +237,29 @@ purity_plot <- ggplot(
   geom_jitter(width = 0.08, size = 2.4, alpha = 0.7, color = "black") +
   geom_text(
     data = purity_counts,
-    aes(x = .data$peak_group, y = 1.02, label = paste0("n = ", .data$n)),
+    aes(x = .data$peak_group, y = 1.025, label = paste0("n = ", .data$n)),
     inherit.aes = FALSE, size = 4.3
   ) +
-  annotate(
-    "text", x = 1.5, y = 0.96,
-    label = paste0("Nominal post hoc Wilcoxon p = ", signif(purity_test$p.value, 2)),
-    size = 4.6, fontface = "bold"
-  ) +
   scale_fill_manual(values = peak_colors) +
-  coord_cartesian(ylim = c(0, 1.05), clip = "off") +
+  coord_cartesian(ylim = c(0, 1.065), clip = "off") +
   labs(
     title = "Melanoma: tumor purity by TNFRSF1A peak",
+    subtitle = paste0(
+      "Exploratory post hoc Wilcoxon test: nominal p = ",
+      format.pval(purity_test$p.value, digits = 2, eps = 0.001)
+    ),
     x = NULL, y = "Tumor purity"
   ) +
   theme_pub() +
-  theme(legend.position = "none")
+  theme(
+    legend.position = "none",
+    plot.subtitle = element_text(size = 12, face = "plain", hjust = 0.5)
+  )
 
 save_ggplot_pair(
   purity_plot,
   file.path(figure_dir, "Supplementary_Figure_S6C_tumor_purity.png"),
-  width = 6, height = 5.2
+  width = 7.2, height = 5.4
 )
 
 peak_summary <- melanoma |>
