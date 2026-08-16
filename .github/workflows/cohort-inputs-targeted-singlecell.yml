@@ -1,10 +1,10 @@
-name: Rebuild IMvigor210 exports and targeted single-cell figures
+name: Validate cohort inputs and targeted single-cell outputs
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
-      - ".github/workflows/imvigor-singlecell.yml"
+      - ".github/workflows/cohort-inputs-targeted-singlecell.yml"
       - "data/source_manifest.tsv"
       - "scripts/fetch_public_sources.py"
       - "scripts/export_imvigor210_inputs.R"
@@ -20,7 +20,7 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/imvigor-singlecell.yml"
+      - ".github/workflows/cohort-inputs-targeted-singlecell.yml"
       - "data/source_manifest.tsv"
       - "scripts/fetch_public_sources.py"
       - "scripts/export_imvigor210_inputs.R"

@@ -702,7 +702,7 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertEqual(source.count("write_marker_workbook(\n"), 2)
 
         workflow = (
-            ROOT / ".github" / "workflows" / "imvigor-singlecell.yml"
+            ROOT / ".github" / "workflows" / "cohort-inputs-targeted-singlecell.yml"
         ).read_text(encoding="utf-8")
         self.assertIn("id: targeted_run", workflow)
         self.assertIn("steps.targeted_run.outcome", workflow)
@@ -1064,13 +1064,33 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertGreaterEqual(float(row["p"]), 0)
             self.assertLessEqual(float(row["p"]), 1)
 
-    def test_reference_figure_checksums(self) -> None:
-        checksum_file = ROOT / "reference_figures" / "SHA256SUMS"
-        for line in checksum_file.read_text(encoding="utf-8").splitlines():
-            expected, relative = line.split(maxsplit=1)
-            path = ROOT / "reference_figures" / relative
-            observed = hashlib.sha256(path.read_bytes()).hexdigest()
-            self.assertEqual(observed, expected, relative)
+    def test_publication_surface_is_indexed_without_empty_placeholders(self) -> None:
+        for relative in (
+            ".github/workflows/README.md",
+            "R/README.md",
+            "data/README.md",
+            "docs/README.md",
+            "reference_results/README.md",
+            "resources/README.md",
+            "scripts/README.md",
+            "tests/README.md",
+            "validation/README.md",
+        ):
+            with self.subTest(relative=relative):
+                self.assertTrue((ROOT / relative).is_file())
+
+        reference_dir = ROOT / "reference_figures"
+        self.assertFalse(reference_dir.exists() and any(reference_dir.iterdir()))
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "The repository is organized around the experimental TNFR1/CAR-T analyses.",
+            readme,
+        )
+        self.assertIn("## Reproduce manuscript figures", readme)
+        self.assertNotIn(
+            "No SQLite database or monolithic R data object is required",
+            readme,
+        )
 
 
 if __name__ == "__main__":

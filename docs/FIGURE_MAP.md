@@ -43,7 +43,7 @@ The repeated-stimulation annotation assigns C3 to the
 `CD8/TRDC-associated cytotoxic state` and C4 to `Cycling T-cell state II`;
 these labels are specific to that independently clustered dataset.
 
-## Clinical-context panels
+## Exploratory published-cohort panels
 
 | Panel | Script | Local input | Expected output |
 |---|---|---|---|
@@ -57,7 +57,7 @@ these labels are specific to that independently clustered dataset.
 | Supplementary Figure S6D,E | `R/08_figure_5E_S6D_S6E.R` | nivolumab-only CheckMate tables | `figures/Supplementary_Figure_S6D_*`; `figures/Supplementary_Figure_S6E_*` |
 | Supplementary Figure S6G | `R/09_figure_5F_S6G.R` | tracked aggregate group-balance table | `results/figure5F/figures/Supplementary_Figure_S6G_C6_group_balance.png` |
 
-All CheckMate clinical-context panels use the 181 nivolumab-treated tumors.
+All CheckMate published-cohort panels use the 181 nivolumab-treated tumors.
 The Figure 5 and Supplementary Figure S6 composites must be assembled entirely
 from these outputs; pooled-arm panels are not compatible with this analysis.
 

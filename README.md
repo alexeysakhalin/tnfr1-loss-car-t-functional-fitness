@@ -1,25 +1,40 @@
-# TNFR1 loss and CAR-T functional fitness: analysis repository
+# TNFR1 loss, inflammatory responsiveness and CAR-T functional fitness
 
-This repository contains analysis code and version-controlled data products for
-the manuscript “Tumor cell TNFR1 loss attenuates inflammatory responsiveness
-and is associated with reduced CAR-T cell functional fitness in an
-antigen-retaining in vitro co-culture model.”
+[![Repository validation](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/validate.yml)
+[![Bulk RNA-seq](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/bulk-rnaseq.yml/badge.svg?branch=main)](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/bulk-rnaseq.yml)
+[![Targeted single-cell and cohort validation](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/cohort-inputs-targeted-singlecell.yml/badge.svg?branch=main)](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/cohort-inputs-targeted-singlecell.yml)
 
-The analyses cover tumor-cell bulk RNA-seq, targeted single-cell mRNA profiling,
-descriptive DepMap context and exploratory analyses of four published
-immune-checkpoint-blockade cohorts. The public cohorts are not CAR-T-treated
-cohorts and do not test a TNFR1-dependent clinical mechanism. Transferred C0-C9
-scores are bulk expression signatures rather than cell fractions or measured
-CAR-T phenotypes in patients.
+Reproducible analysis repository for the manuscript:
+
+> **Tumor cell TNFR1 loss attenuates inflammatory responsiveness and is
+> associated with reduced CAR-T cell functional fitness in an antigen-retaining
+> in vitro co-culture model**
+
+The repository is organized around the experimental TNFR1/CAR-T analyses. Public
+datasets provide descriptive or exploratory context and are not treated as
+clinical CAR-T validation.
+
+| Evidence level | Repository scope | Interpretation |
+|---|---|---|
+| Experimental bulk RNA-seq | Cytokine-response and TNFR1-KO1-versus-WT models | Primary transcriptomic analysis |
+| Targeted single-cell mRNA profiling | Tumor-co-culture C0-C10 states and an independently clustered repeated-stimulation dataset | Descriptive cell-state analysis |
+| Published immune-checkpoint-blockade cohorts | Four-cohort expression summaries and nivolumab-only CheckMate models | Exploratory transfer of bulk expression signatures |
+| DepMap Public 25Q2 | RIPK3/NLRP3 expression context | Descriptive cell-line resource |
+
+The published cohorts are not CAR-T-treated cohorts and do not test a
+TNFR1-dependent clinical mechanism. Transferred C0-C9 scores are bulk
+expression signatures, not cell fractions or measured CAR-T phenotypes in
+patients.
 
 ## Repository structure
 
 | Path | Contents |
 |---|---|
+| `.github/workflows/` | Automated validation and release-oriented rebuilds |
 | `R/` | Figure-generating R scripts and shared plotting/validation functions |
 | `scripts/` | Source acquisition, deterministic table preparation and bulk RNA-seq modelling |
 | `validation/` | Independent CheckMate survival recalculation |
-| `resources/` | Frozen C0-C9 signatures, versioned R/05 and IMvigor210 semantic contracts, curated gene sets and identifier mappings |
+| `resources/` | Frozen signatures, reviewed validation contracts, curated gene sets and identifier mappings |
 | `data/experimental/` | Version-controlled experimental analysis tables and provenance |
 | `data/analysis/` | Aggregate CheckMate results and the compact DepMap S1B derivative |
 | `data/source_manifest.tsv` | Public-source locations, licences, canonical filenames/sizes/SHA-256 values and verification policies |
@@ -30,14 +45,40 @@ CAR-T phenotypes in patients.
 The exact local-only inputs and their required filenames are listed in
 [`docs/REPRODUCIBILITY_INPUTS.md`](docs/REPRODUCIBILITY_INPUTS.md).
 
+## Reproduce manuscript figures
+
+| Manuscript panels | Entry point | Release workflow |
+|---|---|---|
+| Figures 1B-C, 2B-C; Supplementary Figure S2D | `scripts/run_bulk_rnaseq_pydeseq2.py`; `R/render_bulk_rnaseq_figures.R` | `bulk-rnaseq.yml` |
+| Figures 4A-B, 5A; Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | `cohort-inputs-targeted-singlecell.yml` |
+| Figures 5C-G; Supplementary Figure S6 | Numbered cohort scripts `R/01`, `02`, `06`-`10`, `12` | repository validation plus the documented local inputs |
+| Supplementary Figure S1B | `R/11_supplementary_1B.R` | `depmap-s1b.yml` |
+
+See [`docs/FIGURE_MAP.md`](docs/FIGURE_MAP.md) for exact panel filenames,
+inputs and output contracts.
+
+## Data availability
+
+Bulk RNA-seq reads have been submitted to the NCBI Sequence Read Archive under
+BioProject `PRJNA1353901` and are scheduled for public release no later than
+publication. The version-controlled targeted single-cell matrices used by the
+analysis are under `data/experimental/singlecell/`.
+
+Nine author-generated experimental source workbooks are assigned the reserved
+Zenodo version DOI
+[`10.5281/zenodo.19707614`](https://doi.org/10.5281/zenodo.19707614) and will be
+released under CC BY 4.0. Publisher-supplied cohort files, the IMvigor210 package
+and exports, and complete DepMap source files are not redistributed. Their
+official locations, licences, expected byte sizes and checksums are recorded in
+`data/source_manifest.tsv`.
+
 ## Software environment
 
-The automated workflows use Python 3.12 and R 4.4.3 for current analyses. The
-single IMvigor210 package-export job uses a separately pinned legacy R 4.0 /
-Bioconductor 3.11 container because the source package stores a legacy `DESeq`
-`CountDataSet`. The core and bulk RNA-seq requirement files pin different
-dependency versions, so install them in separate environments from the
-repository root.
+The automated workflows use Python 3.12 and R 4.4.3 for current analyses. One
+version-locked public-package export uses a separately pinned legacy R 4.0 /
+Bioconductor 3.11 container because its source object uses the legacy `DESeq`
+format. The core and bulk RNA-seq requirement files pin different dependency
+versions, so install them in separate environments from the repository root.
 
 Core validation and open-cohort preparation:
 
@@ -63,7 +104,7 @@ deactivate
 DepMap renderers; it is not a complete lock for the single-cell or clinical
 scripts. The targeted single-cell script additionally requires `Matrix`,
 `Seurat`, `dplyr`, `tidyr`, `tibble`, `patchwork`, `writexl`,
-`data.table`, `ggplot2` and `scales`. Clinical-context scripts declare their
+`data.table`, `ggplot2` and `scales`. Published-cohort scripts declare their
 package requirements at the start of each file. Archive `sessionInfo()` with
 each final figure run.
 
@@ -129,16 +170,39 @@ single-cell RNA-seq.
 Rscript R/05_figure_4_AB_suppl_S5A.R
 ```
 
-Before figure release, review the exported marker profiles against every manual
-cluster label and archive the before/after QC counts, marker tables and
-`sessionInfo()`.
+The release workflow validates the reviewed cluster-label contract, before/after
+QC counts, marker tables, workbook structure and `sessionInfo()` before it
+publishes figure artifacts. Tumor-co-culture C10 is retained descriptively in
+Figure 4A-B but remains outside the frozen C0-C9 transferred signatures.
 
-## Clinical-context analyses
+## Exploratory analyses in published immunotherapy cohorts
 
-List the required publisher files and prepare the local analysis tables:
+Four published immune-checkpoint-blockade cohorts provide exploratory context
+for the transferred tumor-co-culture signatures:
+
+| Cohort | Disease and treatment context | RNA-profiled samples used |
+|---|---|---:|
+| CheckMate CM-009/010/025 | Clear-cell renal-cell carcinoma; nivolumab arm only | 181 |
+| SU2C-MARK | Non-small-cell lung cancer; immune-checkpoint blockade | 152 |
+| Liu et al. | Melanoma; anti-PD-1 | 121 |
+| IMvigor210 | Urothelial cancer; atezolizumab | 348 |
+
+List the required publisher inputs, follow their source conditions, and prepare
+the local analysis tables:
 
 ```bash
 python scripts/fetch_public_sources.py --list
+python scripts/prepare_open_cohort_analysis_tables.py --include-checkmate-aggregates
+```
+
+The exact filenames, source URLs, checksums and cohort-specific preparation
+steps are documented in [`data/README.md`](data/README.md) and
+[`docs/REPRODUCIBILITY_INPUTS.md`](docs/REPRODUCIBILITY_INPUTS.md).
+
+<details>
+<summary>Recreate the version-locked IMvigor210 inputs locally</summary>
+
+```bash
 python scripts/fetch_public_sources.py \
   --source imvigor210_processed_package \
   --accept-licensed-public-downloads
@@ -147,25 +211,17 @@ Rscript scripts/export_imvigor210_inputs.R \
   --output-dir data/raw
 python scripts/verify_imvigor210_expression.py \
   --input data/raw/IMvigor210_expression_log2CPM.csv
-python scripts/prepare_open_cohort_analysis_tables.py --include-checkmate-aggregates
 ```
 
-The IMvigor210 exporter verifies the official version 1.0.0 package archive,
-recreates the clinical and `log2(CPM + 1)` inputs, checks every expression cell
-against the direct library-size formula and again after CSV write/readback, and
-retains an exact byte gate for the clinical table. Expression-file compatibility
-is instead required at fixed six-decimal semantic precision by the non-identifying
-versioned contract in `resources/`; fixed7/fixed8 hashes are diagnostic only.
-The canonical expression size and SHA-256 in `data/source_manifest.tsv` remain
-provenance, not an acceptance gate. Before mapping or within-sample ranking,
-the cohort preparer converts every accepted expression cell to its fixed6
-`ROUND_HALF_UP` value. Thus all accepted CSV renderings enter analysis as the
-same ordered numeric matrix. Because the package stores a legacy `DESeq`
-`CountDataSet`, this one export step requires the pinned legacy environment.
-Use `--verify-only --output-dir data/raw` to check existing exports without
-loading the package; it invokes the same streaming semantic verifier.
+This legacy-package export is performed in its separately pinned environment.
+The clinical table has an exact byte gate; expression compatibility is checked
+by the non-identifying semantic contract in `resources/` and canonicalized
+before mapping or within-sample ranking. Full validation details are in
+[`data/README.md`](data/README.md#imvigor210).
 
-Then run the clinical-context scripts in manuscript order:
+</details>
+
+Run the figure scripts in manuscript order:
 
 ```bash
 Rscript R/01_validate_analysis_tables.R
@@ -198,13 +254,6 @@ Patient-level clinical and expression data remain local and are excluded by
 only aggregate, non-identifying validation results are version-controlled.
 The IMvigor210 package archive and its two sample-level CSV exports are not
 included in the GitHub release or the DOI-backed project-data archive.
-
-The project source workbooks used to construct the tracked experimental tables
-are deposited separately in Zenodo under the reserved version DOI
-[`10.5281/zenodo.19707614`](https://doi.org/10.5281/zenodo.19707614). The record
-contains project-generated source workbooks, not third-party clinical cohorts,
-DepMap source files or the IMvigor210 package and exports. The DOI will resolve
-publicly after the record is published.
 
 ## DepMap Supplementary Figure S1B
 
@@ -240,7 +289,8 @@ Repository code is available under the MIT License. Project-derived processed
 data and figures are available under CC BY 4.0; third-party data retain their
 source terms. See `LICENSE`, `DATA_LICENSE.md` and `CITATION.cff`.
 
-The clinical-context analyses use processed data accompanying Mariathasan et
-al. (2018), Liu et al. (2019), Braun et al. (2020) and Ravi et al. (2023).
+The exploratory published-cohort analyses use processed data accompanying
+Mariathasan et al. (2018), Liu et al. (2019), Braun et al. (2020) and Ravi et
+al. (2023).
 Exact citations, source URLs, accessions, licences, expected sizes and SHA-256
 checksums are recorded in `data/source_manifest.tsv`.
