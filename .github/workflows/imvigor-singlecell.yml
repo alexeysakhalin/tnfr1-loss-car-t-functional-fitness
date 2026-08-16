@@ -163,7 +163,7 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           packages: |
-            any::Matrix@1.7-6
+            any::Matrix@1.7-2
             any::SeuratObject@5.4.0
             any::Seurat@5.5.1
             any::dplyr@1.2.1
@@ -176,14 +176,14 @@ jobs:
             any::scales@1.4.0
             any::openxlsx@4.2.8.1
           dependencies: '"hard"'
-          cache-version: targeted-singlecell-2026-08-14-v1
+          cache-version: targeted-singlecell-2026-08-14-v2
 
       - name: Assert package versions and tracked input checksums
         run: |
           mkdir -p results/targeted-singlecell-artifact
           Rscript - <<'RSCRIPT'
           expected <- c(
-            Matrix = "1.7-6",
+            Matrix = "1.7-2",
             SeuratObject = "5.4.0",
             Seurat = "5.5.1",
             dplyr = "1.2.1",
