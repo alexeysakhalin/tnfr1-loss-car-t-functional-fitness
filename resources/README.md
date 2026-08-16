@@ -39,3 +39,27 @@ matrix is copied there.
 `Figure_5F_curated_gene_sets.csv` defines the prespecified display categories
 for the exploratory aggregate CheckMate gene-model plot. Identifier maps are
 checksum-pinned snapshots used during cohort preparation.
+
+`IMvigor210_expression_semantic_contract_v1.json` contains no sample or feature
+identifiers and no expression cells. It fixes the complete matrix dimensions,
+ordered-identifier hashes, structural-zero count, direct-formula tolerance and
+the unambiguous UTF-8/LF framing used by the streaming verifier. Fixed6
+`Decimal`/`ROUND_HALF_UP` semantics are the required compatibility gate;
+fixed7 and fixed8 digests are retained only to diagnose harmless rendering
+differences. The canonical whole-file SHA-256 identifies one historical CSV
+rendering for provenance and is not an expression acceptance criterion. The
+same contract requires the preparer to replace each accepted cell by its fixed6
+scaled value before mapping, aggregation, ranking or output. Compatibility is
+therefore analysis-equivalent, including under adversarial sub-six-decimal
+changes.
+
+`IMvigor210_fixed6_canonicalization_impact_v1.json` records the aggregate,
+non-sample-identifying historical A/B check. It names only two prespecified
+genes used in the manuscript-level median comparison. All 61,944
+selected-expression keys were identical;
+59,954 displayed expression values moved by at most
+`4.999993601373376e-7`, while zero rank percentiles changed. Figure 5C scores,
+Supplementary Figure S6 score orderings/Spearman results and all tested
+selection or significance thresholds were unchanged. A regenerated density
+plot can differ at the file-byte level because it uses the rounded expression
+coordinates, but its numerical interpretation is unchanged.

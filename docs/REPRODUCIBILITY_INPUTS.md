@@ -57,7 +57,9 @@ For a flat local directory, omit `bulk_rnaseq/` from the second command.
 
 Place verified publisher files under `data/raw/` using the exact filenames
 below. `scripts/fetch_public_sources.py --list` reports source URLs, licences,
-expected sizes and SHA-256 values.
+canonical sizes and SHA-256 values. These are exact gates except where the
+IMvigor210 expression row explicitly identifies its byte hash as provenance
+and points to the required semantic contract.
 
 | Required filename | Source |
 |---|---|
@@ -66,8 +68,8 @@ expected sizes and SHA-256 values.
 | `41591_2019_654_MOESM4_ESM.xlsx` | Liu et al. clinical supplement |
 | one of `41591_2019_654_MOESM3_ESM.txt` or `Liu2019_NatureMedicine_metastatic_melanoma_antiPD1_expression_matrix.csv` | Liu et al. expression supplement, either as the official text file or the checksum-pinned CSV export accepted by the preparer |
 | `IMvigor210CoreBiologies_1.0.0.tar.gz` | official CC BY 3.0 processed package; supplied to `scripts/export_imvigor210_inputs.R`, not to the cohort-preparation script |
-| `IMvigor210_clinical.csv` | checksum-pinned clinical export generated locally by `scripts/export_imvigor210_inputs.R` |
-| `IMvigor210_expression_log2CPM.csv` | checksum-pinned `log2(CPM + 1)` export generated locally by the same script |
+| `IMvigor210_clinical.csv` | exact-checksum clinical export generated locally by `scripts/export_imvigor210_inputs.R` |
+| `IMvigor210_expression_log2CPM.csv` | semantically pinned `log2(CPM + 1)` export generated locally by the same script; fixed6 contract is required, canonical byte hash is provenance only |
 
 These files contain publisher or sample-level data and are not redistributed
 through the repository. The preparation script writes local-only harmonized
@@ -83,19 +85,38 @@ python scripts/fetch_public_sources.py \
 Rscript scripts/export_imvigor210_inputs.R \
   --package-tarball data/raw/IMvigor210CoreBiologies_1.0.0.tar.gz \
   --output-dir data/raw
+python scripts/verify_imvigor210_expression.py \
+  --input data/raw/IMvigor210_expression_log2CPM.csv
 Rscript scripts/export_imvigor210_inputs.R \
   --verify-only --output-dir data/raw
 ```
 
 The downloader verifies the package archive against the manifest. The exporter
-verifies it again before reading it and publishes the two CSV files only after
-their exact sizes and SHA-256 values match the manifest. Loading the legacy
-`CountDataSet` requires a compatible R/Bioconductor environment with `DESeq`,
-`Biobase` and `edgeR`. The final command checks already generated files without
-loading the package. SHA-256 verification uses the R package `digest` or a
-`sha256sum`/`shasum` executable. The package archive and both CSV files remain
-local-only and are not included in the GitHub release or the DOI-backed
-repository archive, including Zenodo.
+verifies it again before reading it. It retains exact byte gates for that archive
+and the clinical CSV. For expression it checks all cells against the independent
+direct CPM formula, repeats the all-cell check after CSV write/readback, and
+requires the fixed6 semantic digest defined in
+`resources/IMvigor210_expression_semantic_contract_v1.json`. Fixed7/fixed8 and
+the canonical file SHA-256 are provenance diagnostics only. The streaming
+Python verifier retains no expression matrix and its report contains dimensions
+and hashes, never sample/feature identifiers or expression values. The cohort
+preparer then canonicalizes every accepted cell to fixed6 `ROUND_HALF_UP`
+before mapping and ranking; fixed6-compatible CSV variants consequently produce
+the same analysis matrix rather than merely passing the same input check.
+The historical-input impact audit is committed as
+`resources/IMvigor210_fixed6_canonicalization_impact_v1.json`: all 61,944
+selected-expression keys and every rank percentile were unchanged; 59,954
+printed expression values changed by at most `4.999993601373376e-7`. Figure 5C
+scores, S6 score orderings, Spearman results and significance/selection
+thresholds were unchanged. Density-rendering bytes may change on regeneration,
+but no reported interpretation changes.
+
+Loading the legacy `CountDataSet` requires the pinned R 4.0 / Bioconductor 3.11
+environment with `DESeq`, `Biobase` and `edgeR`; current analyses use R 4.4.3.
+The final R command checks already generated files without loading the package
+and invokes the semantic verifier. The package archive and both CSV files remain
+local-only and are not included in the GitHub release or DOI-backed archive,
+including Zenodo.
 
 ## DepMap source files kept outside GitHub
 

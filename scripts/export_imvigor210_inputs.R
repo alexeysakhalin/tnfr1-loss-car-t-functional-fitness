@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# Recreate the two checksum-pinned IMvigor210 inputs used by this project.
+# Recreate the two independently verified IMvigor210 inputs used by this project.
 # The source is the official IMvigor210CoreBiologies 1.0.0 package archive.
 # Patient/sample-level exports are written only to the ignored local data/raw/
 # directory and are never prepared for Git or the DOI-backed code archive.
@@ -24,20 +24,20 @@ EXPECTED_EXPORTS <- list(
   )
 )
 
-# Byte-for-byte CSV identity remains the release gate. This second contract is
-# deliberately insensitive to harmless numeric text formatting: it hashes the
-# complete row-major expression matrix after fixed eight-decimal formatting,
-# while feature and sample identifiers are hashed separately as UTF-8 lines.
-# The expected values were calculated once from the checksum-locked project
-# export. No identifier or expression value is written to diagnostics.
-EXPECTED_EXPRESSION_SEMANTICS <- list(
-  n_rows = 31286L,
-  n_columns = 348L,
-  value_format = "%.8f",
-  row_ids_sha256 = "99c0a222c27bae6c35d479da88aeb8812d5721875f3d5705c5711bffc48c364d",
-  sample_ids_sha256 = "388ef1e09720f61bce1939b15a3b39eec989d415ad590fa07a03dc1ec68619e8",
-  values_sha256 = "da0c1007d1a267f86cb4dbfc0dca85eb8204ef7f2439e60b74ef56eea9d92444"
+# The package archive and clinical export retain exact byte gates. Expression
+# identity is scientific rather than textual: every in-memory value is checked
+# against the direct CPM formula, every value is checked after CSV write/read,
+# and the file is checked by the versioned fixed6 semantic contract. The fixed7
+# and fixed8 hashes are diagnostics only. No identifier or expression value is
+# written to verification reports.
+SEMANTIC_CONTRACT_DEFAULT <- file.path(
+  "resources", "IMvigor210_expression_semantic_contract_v1.json"
 )
+SEMANTIC_VERIFIER_DEFAULT <- file.path(
+  "scripts", "verify_imvigor210_expression.py"
+)
+ALL_CELL_ABSOLUTE_TOLERANCE <- 5e-13
+ALL_CELL_RELATIVE_TOLERANCE <- 5e-14
 
 # write.table/write.csv use scipen when choosing decimal or scientific form.
 # Pin the default used for the canonical exports even if a user profile changes
@@ -52,7 +52,11 @@ usage <- function(status = 0L) {
       "  Rscript scripts/export_imvigor210_inputs.R \\\n",
       "    --package-tarball /path/to/IMvigor210CoreBiologies_1.0.0.tar.gz \\\n",
       "    [--output-dir data/raw] \\\n",
-      "    [--diagnostics-path /path/to/export_diagnostics.tsv]\n",
+      "    [--diagnostics-path /path/to/export_diagnostics.tsv] \\\n",
+      "    [--semantic-report-path /path/to/expression_semantics.json] \\\n",
+      "    [--semantic-contract resources/IMvigor210_expression_semantic_contract_v1.json] \\\n",
+      "    [--semantic-verifier scripts/verify_imvigor210_expression.py] \\\n",
+      "    [--external-semantic-file-verification]\n",
       "  Rscript scripts/export_imvigor210_inputs.R --verify-only \\\n",
       "    [--output-dir data/raw]\n"
     ),
@@ -66,6 +70,10 @@ parse_args <- function(args) {
     package_tarball = NULL,
     output_dir = file.path("data", "raw"),
     diagnostics_path = NULL,
+    semantic_report_path = NULL,
+    semantic_contract = SEMANTIC_CONTRACT_DEFAULT,
+    semantic_verifier = SEMANTIC_VERIFIER_DEFAULT,
+    external_semantic_file_verification = FALSE,
     verify_only = FALSE
   )
   index <- 1L
@@ -76,8 +84,12 @@ parse_args <- function(args) {
     } else if (argument == "--verify-only") {
       parsed$verify_only <- TRUE
       index <- index + 1L
+    } else if (argument == "--external-semantic-file-verification") {
+      parsed$external_semantic_file_verification <- TRUE
+      index <- index + 1L
     } else if (argument %in% c(
-      "--package-tarball", "--output-dir", "--diagnostics-path"
+      "--package-tarball", "--output-dir", "--diagnostics-path",
+      "--semantic-report-path", "--semantic-contract", "--semantic-verifier"
     )) {
       if (index == length(args)) {
         stop("Missing value after ", argument, call. = FALSE)
@@ -87,6 +99,12 @@ parse_args <- function(args) {
         parsed$package_tarball <- value
       } else if (argument == "--diagnostics-path") {
         parsed$diagnostics_path <- value
+      } else if (argument == "--semantic-report-path") {
+        parsed$semantic_report_path <- value
+      } else if (argument == "--semantic-contract") {
+        parsed$semantic_contract <- value
+      } else if (argument == "--semantic-verifier") {
+        parsed$semantic_verifier <- value
       } else {
         parsed$output_dir <- value
       }
@@ -97,6 +115,12 @@ parse_args <- function(args) {
   }
   if (!parsed$verify_only && is.null(parsed$package_tarball)) {
     stop("--package-tarball is required unless --verify-only is used", call. = FALSE)
+  }
+  if (parsed$verify_only && parsed$external_semantic_file_verification) {
+    stop(
+      "--external-semantic-file-verification cannot be used with --verify-only",
+      call. = FALSE
+    )
   }
   parsed
 }
@@ -143,111 +167,113 @@ sha256_file <- function(path) {
   )
 }
 
-sha256_utf8_lines <- function(values) {
-  if (anyNA(values) || any(grepl("[\r\n]", values))) {
-    stop(
-      "Identifiers for semantic hashing must be non-missing single lines.",
-      call. = FALSE
-    )
+compare_expression_matrices <- function(observed, expected, label) {
+  if (!identical(dim(observed), dim(expected))) {
+    stop(label, " dimensions differ.", call. = FALSE)
   }
-  path <- tempfile(pattern = "imvigor210-identifiers-", fileext = ".txt")
-  on.exit(unlink(path), add = TRUE)
-  connection <- file(path, open = "wb")
-  tryCatch(
-    for (value in values) {
-      writeBin(charToRaw(enc2utf8(paste0(value, "\n"))), connection)
-    },
-    finally = close(connection)
+  if (!identical(dimnames(observed), dimnames(expected))) {
+    stop(label, " ordered feature or sample identifiers differ.", call. = FALSE)
+  }
+  if (
+    anyNA(observed) || anyNA(expected) ||
+      any(!is.finite(observed)) || any(!is.finite(expected))
+  ) {
+    stop(label, " contains a non-finite value.", call. = FALSE)
+  }
+  if (any(observed < 0) || any(expected < 0)) {
+    stop(label, " contains a negative value.", call. = FALSE)
+  }
+  if (!identical(observed == 0, expected == 0)) {
+    stop(label, " structural-zero masks differ.", call. = FALSE)
+  }
+
+  absolute_delta <- abs(observed - expected)
+  tolerance <- ALL_CELL_ABSOLUTE_TOLERANCE +
+    ALL_CELL_RELATIVE_TOLERANCE * abs(expected)
+  within_tolerance <- all(absolute_delta <= tolerance)
+  nonzero <- expected != 0
+  max_relative_delta <- if (any(nonzero)) {
+    max(absolute_delta[nonzero] / abs(expected[nonzero]))
+  } else {
+    0
+  }
+  diagnostics <- list(
+    n_rows = nrow(observed),
+    n_columns = ncol(observed),
+    max_absolute_delta = max(absolute_delta),
+    max_relative_delta = max_relative_delta,
+    within_tolerance = within_tolerance
   )
-  sha256_file(path)
+  rm(absolute_delta, tolerance, nonzero)
+  if (!within_tolerance) {
+    stop(label, " exceeds the all-cell numeric tolerance.", call. = FALSE)
+  }
+  diagnostics
 }
 
-expression_semantic_diagnostics <- function(value) {
-  if (is.null(rownames(value)) || is.null(colnames(value))) {
-    stop(
-      "Semantic hashing requires feature and sample identifiers.",
-      call. = FALSE
-    )
-  }
-  if (anyNA(value) || any(!is.finite(value))) {
-    stop(
-      "Semantic hashing requires a finite expression matrix.",
-      call. = FALSE
-    )
-  }
-
-  path <- tempfile(pattern = "imvigor210-values-", fileext = ".txt")
-  on.exit(unlink(path), add = TRUE)
-  connection <- file(path, open = "wb")
-  old_numeric_locale <- Sys.getlocale("LC_NUMERIC")
-  on.exit(
-    suppressWarnings(Sys.setlocale("LC_NUMERIC", old_numeric_locale)),
-    add = TRUE
+read_expression_csv <- function(path) {
+  value <- utils::read.csv(
+    path,
+    header = TRUE,
+    row.names = 1L,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
   )
-  if (is.na(suppressWarnings(Sys.setlocale("LC_NUMERIC", "C")))) {
-    close(connection)
-    stop(
-      "Could not set the C numeric locale for semantic hashing.",
-      call. = FALSE
-    )
-  }
-  tryCatch(
-    for (row_index in seq_len(nrow(value))) {
-      canonical_row <- paste0(
-        paste(
-          sprintf(
-            EXPECTED_EXPRESSION_SEMANTICS$value_format,
-            value[row_index, , drop = TRUE]
-          ),
-          collapse = ","
-        ),
-        "\n"
-      )
-      writeBin(charToRaw(canonical_row), connection)
-    },
-    finally = close(connection)
-  )
-
-  list(
-    n_rows = nrow(value),
-    n_columns = ncol(value),
-    row_ids_sha256 = sha256_utf8_lines(rownames(value)),
-    sample_ids_sha256 = sha256_utf8_lines(colnames(value)),
-    values_sha256 = sha256_file(path)
-  )
+  value <- as.matrix(value)
+  storage.mode(value) <- "double"
+  value
 }
 
-verify_expression_semantics <- function(observed) {
-  expected <- c(
-    n_rows = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_rows),
-    n_columns = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_columns),
-    row_ids_sha256 = EXPECTED_EXPRESSION_SEMANTICS$row_ids_sha256,
-    sample_ids_sha256 = EXPECTED_EXPRESSION_SEMANTICS$sample_ids_sha256,
-    values_sha256 = EXPECTED_EXPRESSION_SEMANTICS$values_sha256
-  )
-  observed_vector <- c(
-    n_rows = as.character(observed$n_rows),
-    n_columns = as.character(observed$n_columns),
-    row_ids_sha256 = observed$row_ids_sha256,
-    sample_ids_sha256 = observed$sample_ids_sha256,
-    values_sha256 = observed$values_sha256
-  )
-  mismatched <- names(expected)[observed_vector != expected]
-  if (length(mismatched) > 0L) {
+python_executable <- function() {
+  candidates <- Sys.which(c("python3", "python"))
+  candidates <- unname(candidates[nzchar(candidates)])
+  if (length(candidates) == 0L) {
     stop(
-      "Generated expression semantic contract mismatch: ",
-      paste(mismatched, collapse = ", "),
+      "Python is required for IMvigor210 expression semantic verification.",
       call. = FALSE
     )
   }
-  message(
-    "VERIFIED\texpression_semantics\tvalues_sha256=",
-    observed$values_sha256
+  candidates[[1L]]
+}
+
+verify_expression_file_semantically <- function(
+  path, semantic_contract, semantic_verifier, report_path = NULL
+) {
+  if (!file.exists(semantic_contract) || dir.exists(semantic_contract)) {
+    stop("Semantic contract is missing.", call. = FALSE)
+  }
+  if (!file.exists(semantic_verifier) || dir.exists(semantic_verifier)) {
+    stop("Semantic verifier is missing.", call. = FALSE)
+  }
+  command_arguments <- c(
+    semantic_verifier,
+    "--input", path,
+    "--contract", semantic_contract
   )
+  if (!is.null(report_path)) {
+    command_arguments <- c(command_arguments, "--report", report_path)
+  }
+  output <- system2(
+    python_executable(),
+    args = shQuote(command_arguments),
+    stdout = TRUE,
+    stderr = TRUE
+  )
+  status <- attr(output, "status")
+  if (!is.null(status) && status != 0L) {
+    stop(
+      "Expression semantic verifier failed. Its output is redacted; ",
+      paste(output, collapse = "\n"),
+      call. = FALSE
+    )
+  }
+  message("VERIFIED\timvigor210_expression_semantic_contract_v1")
   invisible(TRUE)
 }
 
-write_export_diagnostics <- function(path, staged_paths, expression_semantics) {
+write_export_diagnostics <- function(
+  path, staged_paths, direct_diagnostics, readback_diagnostics
+) {
   if (is.null(path)) {
     return(invisible(NULL))
   }
@@ -272,30 +298,61 @@ write_export_diagnostics <- function(path, staged_paths, expression_semantics) {
     clinical_sha256 = sha256_file(staged_paths[["clinical"]]),
     expression_size_bytes = as.character(expression_size),
     expression_sha256 = sha256_file(staged_paths[["expression"]]),
-    expression_rows = as.character(expression_semantics$n_rows),
-    expression_columns = as.character(expression_semantics$n_columns),
-    expression_row_ids_sha256 = expression_semantics$row_ids_sha256,
-    expression_sample_ids_sha256 = expression_semantics$sample_ids_sha256,
-    expression_values_8dp_sha256 = expression_semantics$values_sha256
+    expression_rows = as.character(direct_diagnostics$n_rows),
+    expression_columns = as.character(direct_diagnostics$n_columns),
+    direct_formula_max_absolute_delta = format(
+      direct_diagnostics$max_absolute_delta, scientific = TRUE, digits = 17
+    ),
+    direct_formula_max_relative_delta = format(
+      direct_diagnostics$max_relative_delta, scientific = TRUE, digits = 17
+    ),
+    direct_formula_all_cells_within_tolerance =
+      as.character(direct_diagnostics$within_tolerance),
+    write_readback_max_absolute_delta = format(
+      readback_diagnostics$max_absolute_delta, scientific = TRUE, digits = 17
+    ),
+    write_readback_max_relative_delta = format(
+      readback_diagnostics$max_relative_delta, scientific = TRUE, digits = 17
+    ),
+    write_readback_all_cells_within_tolerance =
+      as.character(readback_diagnostics$within_tolerance)
   )
   expected <- c(
     clinical_size_bytes = as.character(EXPECTED_EXPORTS$clinical$size_bytes),
     clinical_sha256 = EXPECTED_EXPORTS$clinical$sha256,
     expression_size_bytes = as.character(EXPECTED_EXPORTS$expression$size_bytes),
     expression_sha256 = EXPECTED_EXPORTS$expression$sha256,
-    expression_rows = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_rows),
-    expression_columns = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_columns),
-    expression_row_ids_sha256 = EXPECTED_EXPRESSION_SEMANTICS$row_ids_sha256,
-    expression_sample_ids_sha256 =
-      EXPECTED_EXPRESSION_SEMANTICS$sample_ids_sha256,
-    expression_values_8dp_sha256 =
-      EXPECTED_EXPRESSION_SEMANTICS$values_sha256
+    expression_rows = "31286",
+    expression_columns = "348",
+    direct_formula_max_absolute_delta = "aggregate diagnostic",
+    direct_formula_max_relative_delta = "aggregate diagnostic",
+    direct_formula_all_cells_within_tolerance = "TRUE",
+    write_readback_max_absolute_delta = "aggregate diagnostic",
+    write_readback_max_relative_delta = "aggregate diagnostic",
+    write_readback_all_cells_within_tolerance = "TRUE"
   )
+  required <- c(
+    clinical_size_bytes = TRUE,
+    clinical_sha256 = TRUE,
+    expression_size_bytes = FALSE,
+    expression_sha256 = FALSE,
+    expression_rows = TRUE,
+    expression_columns = TRUE,
+    direct_formula_max_absolute_delta = FALSE,
+    direct_formula_max_relative_delta = FALSE,
+    direct_formula_all_cells_within_tolerance = TRUE,
+    write_readback_max_absolute_delta = FALSE,
+    write_readback_max_relative_delta = FALSE,
+    write_readback_all_cells_within_tolerance = TRUE
+  )
+  match <- observed == expected
+  match[grepl("_max_(absolute|relative)_delta$", names(match))] <- NA
   diagnostics <- data.frame(
     metric = names(observed),
     observed = unname(observed),
     expected = unname(expected),
-    match = unname(observed == expected),
+    required = unname(required),
+    match = unname(match),
     stringsAsFactors = FALSE
   )
   utils::write.table(
@@ -333,15 +390,18 @@ verify_file <- function(path, specification, label) {
   invisible(TRUE)
 }
 
-verify_exports <- function(output_dir) {
-  for (name in names(EXPECTED_EXPORTS)) {
-    specification <- EXPECTED_EXPORTS[[name]]
-    verify_file(
-      file.path(output_dir, specification$filename),
-      specification,
-      paste0("imvigor210_", name, "_export")
-    )
-  }
+verify_exports <- function(output_dir, arguments, report_path = NULL) {
+  verify_file(
+    file.path(output_dir, EXPECTED_EXPORTS$clinical$filename),
+    EXPECTED_EXPORTS$clinical,
+    "imvigor210_clinical_export"
+  )
+  verify_expression_file_semantically(
+    file.path(output_dir, EXPECTED_EXPORTS$expression$filename),
+    arguments$semantic_contract,
+    arguments$semantic_verifier,
+    report_path
+  )
   invisible(TRUE)
 }
 
@@ -356,7 +416,7 @@ write_canonical_csv <- function(value, path) {
   )
 }
 
-publish_verified_exports <- function(staged_paths, output_dir) {
+publish_verified_exports <- function(staged_paths, output_dir, arguments) {
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   }
@@ -369,11 +429,18 @@ publish_verified_exports <- function(staged_paths, output_dir) {
     function(specification) file.path(output_dir, specification$filename),
     character(1L)
   )
-  for (name in names(final_paths)) {
-    final_path <- final_paths[[name]]
-    if (file.exists(final_path)) {
-      verify_file(final_path, EXPECTED_EXPORTS[[name]], paste0("existing_", name))
-    }
+  if (file.exists(final_paths[["clinical"]])) {
+    verify_file(
+      final_paths[["clinical"]], EXPECTED_EXPORTS$clinical, "existing_clinical"
+    )
+  }
+  if (file.exists(final_paths[["expression"]])) {
+    verify_expression_file_semantically(
+      final_paths[["expression"]],
+      arguments$semantic_contract,
+      arguments$semantic_verifier,
+      arguments$semantic_report_path
+    )
   }
 
   temporary_paths <- stats::setNames(
@@ -395,9 +462,17 @@ publish_verified_exports <- function(staged_paths, output_dir) {
     if (!copied) {
       stop("Could not stage output: ", final_paths[[name]], call. = FALSE)
     }
-    verify_file(
-      temporary_paths[[name]], EXPECTED_EXPORTS[[name]], paste0("staged_", name)
-    )
+    if (name == "clinical") {
+      verify_file(
+        temporary_paths[[name]], EXPECTED_EXPORTS[[name]], "staged_clinical"
+      )
+    } else {
+      if (!identical(
+        sha256_file(temporary_paths[[name]]), sha256_file(staged_paths[[name]])
+      )) {
+        stop("Expression export changed during local publication.", call. = FALSE)
+      }
+    }
   }
 
   for (name in names(final_paths)) {
@@ -408,12 +483,19 @@ publish_verified_exports <- function(staged_paths, output_dir) {
       stop("Could not publish output: ", final_paths[[name]], call. = FALSE)
     }
   }
-  verify_exports(output_dir)
+  verify_file(
+    final_paths[["clinical"]], EXPECTED_EXPORTS$clinical, "published_clinical"
+  )
+  if (!file.exists(final_paths[["expression"]])) {
+    stop("Published expression export is missing.", call. = FALSE)
+  }
 }
 
 arguments <- parse_args(commandArgs(trailingOnly = TRUE))
 if (arguments$verify_only) {
-  verify_exports(arguments$output_dir)
+  verify_exports(
+    arguments$output_dir, arguments, arguments$semantic_report_path
+  )
   quit(save = "no", status = 0L)
 }
 
@@ -507,6 +589,20 @@ if (anyNA(expression_log2cpm) || any(!is.finite(expression_log2cpm))) {
   stop("The normalized expression matrix contains non-finite values.", call. = FALSE)
 }
 
+library_sizes <- colSums(count_matrix)
+if (anyNA(library_sizes) || any(!is.finite(library_sizes)) || any(library_sizes <= 0)) {
+  stop("The count matrix contains an invalid library size.", call. = FALSE)
+}
+direct_expression_log2cpm <- log2(
+  sweep(count_matrix, 2L, library_sizes, "/") * 1e6 + 1
+)
+direct_diagnostics <- compare_expression_matrices(
+  expression_log2cpm,
+  direct_expression_log2cpm,
+  "edgeR CPM and direct-formula expression"
+)
+rm(direct_expression_log2cpm, library_sizes)
+
 staged_paths <- c(
   clinical = file.path(staging_dir, EXPECTED_EXPORTS$clinical$filename),
   expression = file.path(staging_dir, EXPECTED_EXPORTS$expression$filename)
@@ -514,17 +610,34 @@ staged_paths <- c(
 write_canonical_csv(clinical, staged_paths[["clinical"]])
 write_canonical_csv(expression_log2cpm, staged_paths[["expression"]])
 
-expression_semantics <- expression_semantic_diagnostics(expression_log2cpm)
+readback_expression_log2cpm <- read_expression_csv(staged_paths[["expression"]])
+readback_diagnostics <- compare_expression_matrices(
+  readback_expression_log2cpm,
+  expression_log2cpm,
+  "Written/read-back expression and in-memory expression"
+)
+rm(readback_expression_log2cpm)
 write_export_diagnostics(
-  arguments$diagnostics_path, staged_paths, expression_semantics
+  arguments$diagnostics_path,
+  staged_paths,
+  direct_diagnostics,
+  readback_diagnostics
 )
-verify_expression_semantics(expression_semantics)
 verify_file(staged_paths[["clinical"]], EXPECTED_EXPORTS$clinical, "generated_clinical")
-verify_file(
-  staged_paths[["expression"]], EXPECTED_EXPORTS$expression,
-  "generated_expression"
-)
-publish_verified_exports(staged_paths, arguments$output_dir)
+if (!arguments$external_semantic_file_verification) {
+  verify_expression_file_semantically(
+    staged_paths[["expression"]],
+    arguments$semantic_contract,
+    arguments$semantic_verifier,
+    arguments$semantic_report_path
+  )
+} else {
+  message(
+    "DEFERRED\timvigor210_expression_semantic_contract_v1\t",
+    "external caller must verify before use"
+  )
+}
+publish_verified_exports(staged_paths, arguments$output_dir, arguments)
 
 message("R_VERSION\t", R.version.string)
 message("DESEQ_VERSION\t", as.character(utils::packageVersion("DESeq")))

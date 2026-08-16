@@ -1,0 +1,101 @@
+{
+  "semantic_contract_version": 1,
+  "dataset": "IMvigor210 expression log2-CPM export",
+  "source_package": {
+    "filename": "IMvigor210CoreBiologies_1.0.0.tar.gz",
+    "sha256": "cfdd3176d7b34de5b04fb9416bfd2b20fa4b6e238aaad5f20b048a34329ea178",
+    "size_bytes": 122127298
+  },
+  "clinical_export_byte_identity": {
+    "filename": "IMvigor210_clinical.csv",
+    "sha256": "95b04cb21c885f4b49e1f683d95d44e81a4058e1fd24f3cd15630141292210c0",
+    "size_bytes": 76315,
+    "verification_role": "required"
+  },
+  "canonical_expression_export": {
+    "filename": "IMvigor210_expression_log2CPM.csv",
+    "sha256": "8cf708b412a4843ad0c2d6d73f3fe804b3308becae8693731113a7b2a573b81c",
+    "size_bytes": 121488490,
+    "verification_role": "provenance only; semantic fixed6 compatibility is required"
+  },
+  "authoritative_formula": {
+    "R": "log2(sweep(count_matrix, 2L, colSums(count_matrix), \"/\") * 1e6 + 1)",
+    "scope": "all 31,286 features and all 348 samples; no filtering",
+    "required_checks": [
+      "ordered dimensions and dimnames",
+      "finite nonnegative values",
+      "identical structural-zero mask",
+      "all-cell direct-formula tolerance",
+      "all-cell CSV write/readback tolerance"
+    ]
+  },
+  "all_cell_tolerance": {
+    "absolute": "5e-13",
+    "relative": "5e-14",
+    "criterion": "abs(observed - expected) <= 5e-13 + 5e-14 * abs(expected)"
+  },
+  "shape": {
+    "rows": 31286,
+    "columns": 348,
+    "values": 10887528
+  },
+  "numeric_constraints": {
+    "finite": true,
+    "nonnegative": true,
+    "zero_count": 4363672,
+    "reference_minimum": "0",
+    "reference_maximum": "17.3494939622185"
+  },
+  "ordered_identifier_digests": {
+    "algorithm": "sha256",
+    "framing": "IMVIGOR210_ORDERED_IDS_V1 LF, then for each ordered identifier: decimal UTF-8 byte length, colon, identifier bytes, LF",
+    "row_ids_sha256": "cf43c23e5333fbf88c1f957dd31e5bcb123f1a2b3e33bd928ffaafe3e799a53d",
+    "column_ids_sha256": "c034a832b17c78d6c7eb65526322169653c89f093ec7fc0e9ccae9f5204c8e70"
+  },
+  "semantic_digests": {
+    "algorithm": "sha256",
+    "decimal_parser": "Python Decimal",
+    "rounding": "ROUND_HALF_UP",
+    "framing": [
+      "IMVIGOR210_EXPRESSION_SEMANTIC_V1 LF",
+      "scale=<scale> LF; rows=<rows> LF; columns=<columns> LF; column_ids LF",
+      "each ordered column identifier as decimal UTF-8 byte length, colon, identifier bytes, LF",
+      "rows LF",
+      "each row as decimal UTF-8 byte length, colon, row identifier bytes, TAB, then TAB-separated scaled base-10 integers, LF",
+      "a scaled integer is ROUND_HALF_UP(value, scale) multiplied by 10**scale; zero is encoded as 0"
+    ],
+    "required_scale": 6,
+    "diagnostic_scales": [
+      7,
+      8
+    ],
+    "reference_sha256": {
+      "fixed6": "2c62f046f93f13ffb9034c2cf7887c322cb61144c653e31f260cbbfebdd7dcfa",
+      "fixed7": "3acca75b245771e0f3385ead31a0477d8366576244726cf84055e535520ae9bd",
+      "fixed8": "b61085abe13e5f42949b78618509398a11e5e4b190343b423977ce9da4ace341"
+    }
+  },
+  "analysis_canonicalization": {
+    "required": true,
+    "scale": 6,
+    "rounding": "ROUND_HALF_UP",
+    "operation": "Before identifier mapping, aggregation, ranking or selected-expression output, replace every parsed expression cell by fixed6_scaled_integer / 1000000.0.",
+    "guarantee": "All CSV files accepted by the required fixed6 semantic digest enter downstream analysis as the same ordered numeric matrix."
+  },
+  "privacy": {
+    "contract_contains_identifiers_or_expression_cells": false,
+    "verification_reports_may_contain": [
+      "dimensions",
+      "counts",
+      "cryptographic digests",
+      "aggregate tolerance diagnostics",
+      "software versions"
+    ],
+    "verification_reports_must_not_contain": [
+      "sample identifiers",
+      "feature identifiers",
+      "expression values",
+      "patient-level metadata"
+    ]
+  }
+}

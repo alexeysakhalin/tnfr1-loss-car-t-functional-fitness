@@ -119,20 +119,26 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("--package-tarball", exporter)
         self.assertIn("--verify-only", exporter)
         self.assertIn("--diagnostics-path", exporter)
+        self.assertIn("--semantic-report-path", exporter)
+        self.assertIn("--external-semantic-file-verification", exporter)
         self.assertIn(clinical["sha256"], exporter)
         self.assertIn(expression["sha256"], exporter)
         self.assertIn(package["sha256"], exporter)
-        for semantic_digest in (
-            "99c0a222c27bae6c35d479da88aeb8812d5721875f3d5705c5711bffc48c364d",
-            "388ef1e09720f61bce1939b15a3b39eec989d415ad590fa07a03dc1ec68619e8",
-            "da0c1007d1a267f86cb4dbfc0dca85eb8204ef7f2439e60b74ef56eea9d92444",
-        ):
-            self.assertIn(semantic_digest, exporter)
-        self.assertIn('value_format = "%.8f"', exporter)
-        self.assertIn("expression_semantic_diagnostics", exporter)
-        self.assertLess(
-            exporter.index("verify_expression_semantics(expression_semantics)"),
-            exporter.index('verify_file(staged_paths[["clinical"]]'),
+        self.assertIn(
+            'sweep(count_matrix, 2L, library_sizes, "/") * 1e6 + 1',
+            exporter,
+        )
+        self.assertIn("ALL_CELL_ABSOLUTE_TOLERANCE <- 5e-13", exporter)
+        self.assertIn("ALL_CELL_RELATIVE_TOLERANCE <- 5e-14", exporter)
+        self.assertIn("compare_expression_matrices", exporter)
+        self.assertIn("read_expression_csv", exporter)
+        self.assertIn("verify_expression_file_semantically", exporter)
+        self.assertIn("IMvigor210_expression_semantic_contract_v1.json", exporter)
+        self.assertNotIn("EXPECTED_EXPRESSION_SEMANTICS", exporter)
+        self.assertNotIn("expression_values_8dp_sha256", exporter)
+        self.assertNotIn(
+            'verify_file(\n  staged_paths[["expression"]], EXPECTED_EXPORTS$expression',
+            exporter,
         )
         self.assertLess(
             exporter.index("observed_sha256 <- sha256_file(path)"),
@@ -149,6 +155,41 @@ class RepositoryContractTests(unittest.TestCase):
             exporter.index('verify_file(staged_paths[["clinical"]]'),
             exporter.index("publish_verified_exports(staged_paths"),
         )
+
+        contract_path = (
+            ROOT / "resources" / "IMvigor210_expression_semantic_contract_v1.json"
+        )
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        self.assertEqual(contract["semantic_contract_version"], 1)
+        self.assertEqual(contract["semantic_digests"]["required_scale"], 6)
+        self.assertEqual(contract["semantic_digests"]["diagnostic_scales"], [7, 8])
+        self.assertTrue(contract["analysis_canonicalization"]["required"])
+        self.assertEqual(contract["analysis_canonicalization"]["scale"], 6)
+        self.assertEqual(
+            contract["analysis_canonicalization"]["rounding"], "ROUND_HALF_UP"
+        )
+        self.assertFalse(
+            contract["privacy"]["contract_contains_identifiers_or_expression_cells"]
+        )
+        preparer = (
+            ROOT / "scripts" / "prepare_open_cohort_analysis_tables.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("semantically_verified_imvigor_expression", preparer)
+        self.assertIn("verifier.verify_expression", preparer)
+        self.assertIn("canonical_imvigor_fixed6", preparer)
+        self.assertIn('"expression_semantic_scale": IMVIGOR_EXPRESSION_SCALE', preparer)
+        imvigor_function = preparer.split("def prepare_imvigor(", 1)[1].split(
+            "\ndef workbook_header", 1
+        )[0]
+        self.assertNotIn(
+            'verified_input(raw_dir, manifest, "imvigor210_expression_export")',
+            imvigor_function,
+        )
+        self.assertIn(
+            "[canonical_imvigor_fixed6(value) for value in row[1:]]",
+            imvigor_function,
+        )
+        self.assertNotIn("[as_float(value) for value in row[1:]]", imvigor_function)
 
         data_readme = (ROOT / "data" / "README.md").read_text(encoding="utf-8")
         input_inventory = (
@@ -681,14 +722,14 @@ class RepositoryContractTests(unittest.TestCase):
         )
         self.assertGreaterEqual(workflow.count("if: always()"), 2)
         self.assertGreaterEqual(
-            workflow.count("R_LIBS=/runner-temp/imvigor210-r-library"), 4
+            workflow.count("R_LIBS=/runner-temp/imvigor210-r-library"), 3
         )
         self.assertIn("lib = library_path", workflow)
         self.assertIn("find.package(package, lib.loc = library_path)", workflow)
         install_step = workflow.split(
             "      - name: Install and assert the legacy top-level packages\n", 1
         )[1].split(
-            "      - name: Recreate and checksum-verify both exports\n", 1
+            "      - name: Recreate and scientifically verify both exports\n", 1
         )[0]
         self.assertIn("docker run --rm -i \\", install_step)
         self.assertIn("for package in DESeq Biobase edgeR; do", install_step)
@@ -716,6 +757,17 @@ class RepositoryContractTests(unittest.TestCase):
             "--diagnostics-path "
             "/runner-temp/imvigor210-verification/export_diagnostics.tsv",
             workflow,
+        )
+        self.assertIn(
+            "python scripts/verify_imvigor210_expression.py \\\n",
+            workflow,
+        )
+        self.assertIn("--external-semantic-file-verification", workflow)
+        self.assertIn(
+            "expression_semantic_verification.json", workflow
+        )
+        self.assertEqual(
+            workflow.count("Validate the non-identifying semantic framing"), 1
         )
         self.assertIn(
             "path: ${{ runner.temp }}/imvigor210-verification/",

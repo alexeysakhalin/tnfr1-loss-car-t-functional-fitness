@@ -15,7 +15,7 @@ exports in one directory.
 
 | Path | Contents | Version-controlled |
 |---|---|---|
-| `data/source_manifest.tsv` | Source URLs, citations, accessions, licences, expected filenames and SHA-256 values | yes |
+| `data/source_manifest.tsv` | Source URLs, citations, accessions, licences, canonical filenames/checksums and verification notes | yes |
 | `data/experimental/` | Non-identifying project-derived transcriptomic analysis tables, checksums and QC | yes |
 | `data/depmap/raw/` | Checksum-pinned DepMap expression ZIP and `Model.csv` used for S1B | no |
 | `data/analysis/depmap_s1b_eligible_models.tsv.gz` | Eligible DepMap S1B models, expression, flags and quadrants | yes |
@@ -59,7 +59,8 @@ Place these verified files in `data/raw/` before running the preparation step:
   (Liu clinical table and TPM matrix);
 - `IMvigor210_clinical.csv` and `IMvigor210_expression_log2CPM.csv`, recreated
   locally from the checksum-pinned `IMvigor210CoreBiologies` 1.0.0 package as
-  described below;
+  described below; the clinical file has an exact byte gate, while expression
+  uses the versioned semantic contract;
 - `41591_2020_839_MOESM2_ESM.xlsx` (downloaded by the script for local
   CheckMate calculations).
 
@@ -112,9 +113,10 @@ genes.
 
 The public processed package is `IMvigor210CoreBiologies` 1.0.0 (CC BY 3.0).
 Raw sequencing data at EGA are controlled access and are not used by the
-downloader. The preparation script consumes two checksum-pinned project
-exports: the clinical data frame and the log2-CPM expression matrix. Recreate
-them from the official package archive with:
+downloader. The preparation script consumes two locally generated project
+exports: an exact-checksum clinical data frame and a semantically verified
+log2-CPM expression matrix. Recreate them from the official package archive
+with:
 
 ```bash
 python scripts/fetch_public_sources.py \
@@ -123,22 +125,38 @@ python scripts/fetch_public_sources.py \
 Rscript scripts/export_imvigor210_inputs.R \
   --package-tarball data/raw/IMvigor210CoreBiologies_1.0.0.tar.gz \
   --output-dir data/raw
+python scripts/verify_imvigor210_expression.py \
+  --input data/raw/IMvigor210_expression_log2CPM.csv
 ```
 
 The exporter first verifies the 122,127,298-byte package archive against
 SHA-256 `cfdd3176d7b34de5b04fb9416bfd2b20fa4b6e238aaad5f20b048a34329ea178`.
 It loads the package `cds` object, writes `Biobase::pData(cds)` as the clinical
 table, and calculates `log2(edgeR::cpm(DESeq::counts(cds)) + 1)` on the complete
-31,286-feature count matrix. It requires a legacy R/Bioconductor environment
-that can load the package's `DESeq` `CountDataSet`, plus either the R package
-`digest` or a `sha256sum`/`shasum` executable. Both generated CSV files must
-match the byte sizes and SHA-256 values in `source_manifest.tsv`; a checksum
-mismatch stops the export. Existing local files can be checked with:
+31,286-feature count matrix. Every cell must agree with the independent direct
+formula `log2(sweep(counts, 2, colSums(counts), "/") * 1e6 + 1)` and with the
+CSV write/readback within `5e-13 + 5e-14 * abs(expected)`; ordered identifiers,
+dimensions, finite/nonnegative values and the structural-zero mask must also
+match. It requires the pinned legacy R 4.0 / Bioconductor 3.11 environment.
+
+The package archive and clinical CSV retain exact size/SHA-256 gates. The
+expression CSV instead must match the fixed6 digest in
+`resources/IMvigor210_expression_semantic_contract_v1.json`; fixed7 and fixed8
+hashes are diagnostics. Its manifest size and SHA-256 identify the canonical
+historical rendering but are not acceptance gates. The streaming verifier uses
+only Python's standard library and writes no identifiers or expression values
+to its report. Existing local files can be checked with:
 
 ```bash
 Rscript scripts/export_imvigor210_inputs.R \
   --verify-only --output-dir data/raw
 ```
+
+`scripts/prepare_open_cohort_analysis_tables.py` repeats the expression
+semantic verification before reading the matrix and converts every value to
+the required fixed6 `ROUND_HALF_UP` representation before identifier mapping,
+aggregation, within-sample ranking or output. Therefore sub-six-decimal text
+differences cannot alter a rank or another downstream result.
 
 The official package archive and both patient/sample-level CSV exports remain
 local-only. They are excluded from Git and from the DOI-backed code/data

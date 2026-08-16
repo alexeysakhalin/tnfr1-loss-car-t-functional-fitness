@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "source_expression_sha256": "8cf708b412a4843ad0c2d6d73f3fe804b3308becae8693731113a7b2a573b81c",
+  "semantic_contract_sha256": "1b484e0c2f33565e967d395b45e30d114a4495d7fc604df5aaa84ccd54f1e503",
+  "comparison": {
+    "old_analysis_domain": "unquantized parsed expression",
+    "new_analysis_domain": "fixed6 ROUND_HALF_UP before mapping and ranking",
+    "selected_expression_rows": 61944,
+    "ordered_keys_equal": true,
+    "expr_value_rows_changed": 59954,
+    "expr_value_max_absolute_change": "4.999993601373376e-7",
+    "rank_percentile_rows_changed": 0,
+    "rank_percentile_max_absolute_change": "0",
+    "old_selected_expression_sha256": "bcf82bc0a104c6d8ff574e9c51e7f1f1c06607c1acef96c6ef16134446746c13",
+    "new_selected_expression_sha256": "63f3af1f5cc977df95448d5475a3a7ace43e15a79a99b4836b2e0321ea818bac"
+  },
+  "downstream_checks": {
+    "figure_5c_samples": 348,
+    "figure_5c_tcell_rank_scores_changed": 0,
+    "figure_5c_max_absolute_score_change": "0",
+    "supplementary_s6_score_rankings_changed": {
+      "Tcell": 0,
+      "TNF_IFNG": 0,
+      "NFkB": 0,
+      "ICAM1": 0
+    },
+    "supplementary_s6_spearman_results_changed": 0,
+    "supplementary_s6_nominal_or_bh_significance_changes": 0,
+    "supplementary_s6a_medians": {
+      "TNFRSF1A_old": "6.8373422214372646",
+      "TNFRSF1A_new": "6.837342",
+      "TNFRSF1A_absolute_change": "2.2143726496892668e-7",
+      "IFNGR1_old": "6.793362571585265",
+      "IFNGR1_new": "6.7933625",
+      "IFNGR1_absolute_change": "7.15852648269788e-8"
+    },
+    "selection_or_group_threshold_changes": 0
+  },
+  "interpretation": "Canonicalization changes only sub-six-decimal expression rendering in the historical input. It changes no within-sample rank, Figure 5C score, score ordering, Spearman result, significance call or selection/group threshold. Density-based figure files may not remain byte-identical after regeneration, but the numerical interpretation is unchanged.",
+  "privacy": {
+    "contains_sample_identifiers": false,
+    "contains_source_feature_identifiers": false,
+    "contains_prespecified_gene_symbols": true,
+    "contains_expression_cells": false
+  },
+  "comparison_environment": {
+    "python": "3.12.13",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0"
+  }
+}

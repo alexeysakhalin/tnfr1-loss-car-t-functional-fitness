@@ -18,10 +18,12 @@ in `data/source_manifest.tsv` and `data/README.md`. In particular, the Braun
 CheckMate source workbook and all sample-level derivatives are not distributed
 by this repository.
 
-The official `IMvigor210CoreBiologies` package and the two checksum-pinned
-patient/sample-level CSV exports generated from it also remain local-only.
-They are recreated with `scripts/export_imvigor210_inputs.R` and are not
-included in GitHub or in the DOI-backed archive, including Zenodo.
+The official `IMvigor210CoreBiologies` package and the two version-locked
+patient/sample-level CSV exports generated from it also remain local-only. The
+clinical export has an exact checksum gate; the expression export has a
+non-identifying versioned semantic contract. They are recreated with
+`scripts/export_imvigor210_inputs.R` and are not included in GitHub or in the
+DOI-backed archive, including Zenodo.
 
 The complete DepMap Public 25Q2 expression ZIP and same-release source
 `Model.csv` used for Supplementary Figure S1B are also not distributed. They

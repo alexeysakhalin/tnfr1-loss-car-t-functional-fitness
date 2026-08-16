@@ -19,10 +19,10 @@ CAR-T phenotypes in patients.
 | `R/` | Figure-generating R scripts and shared plotting/validation functions |
 | `scripts/` | Source acquisition, deterministic table preparation and bulk RNA-seq modelling |
 | `validation/` | Independent CheckMate survival recalculation |
-| `resources/` | Frozen C0-C9 signatures, the versioned R/05 concordance contract, curated gene sets and identifier mappings |
+| `resources/` | Frozen C0-C9 signatures, versioned R/05 and IMvigor210 semantic contracts, curated gene sets and identifier mappings |
 | `data/experimental/` | Version-controlled experimental analysis tables and provenance |
 | `data/analysis/` | Aggregate CheckMate results and the compact DepMap S1B derivative |
-| `data/source_manifest.tsv` | Public-source locations, licences, expected filenames, sizes and SHA-256 values |
+| `data/source_manifest.tsv` | Public-source locations, licences, canonical filenames/sizes/SHA-256 values and verification policies |
 | `reference_results/` | Aggregate numerical reference results without sample identifiers |
 | `docs/` | Analysis details, figure map and complete input inventory |
 | `tests/` | Structural and numerical regression tests |
@@ -32,9 +32,12 @@ The exact local-only inputs and their required filenames are listed in
 
 ## Software environment
 
-The automated workflows use Python 3.12 and R 4.4.3. The core and bulk
-RNA-seq requirement files pin different dependency versions, so install them
-in separate environments from the repository root.
+The automated workflows use Python 3.12 and R 4.4.3 for current analyses. The
+single IMvigor210 package-export job uses a separately pinned legacy R 4.0 /
+Bioconductor 3.11 container because the source package stores a legacy `DESeq`
+`CountDataSet`. The core and bulk RNA-seq requirement files pin different
+dependency versions, so install them in separate environments from the
+repository root.
 
 Core validation and open-cohort preparation:
 
@@ -142,16 +145,25 @@ python scripts/fetch_public_sources.py \
 Rscript scripts/export_imvigor210_inputs.R \
   --package-tarball data/raw/IMvigor210CoreBiologies_1.0.0.tar.gz \
   --output-dir data/raw
+python scripts/verify_imvigor210_expression.py \
+  --input data/raw/IMvigor210_expression_log2CPM.csv
 python scripts/prepare_open_cohort_analysis_tables.py --include-checkmate-aggregates
 ```
 
 The IMvigor210 exporter verifies the official version 1.0.0 package archive,
-recreates the clinical and `log2(CPM + 1)` inputs, and publishes them locally
-only when their byte sizes and SHA-256 values match `data/source_manifest.tsv`.
-Because the package stores a legacy `DESeq` `CountDataSet`, this one export step
-requires a compatible legacy R/Bioconductor environment. Use
-`--verify-only --output-dir data/raw` to check existing exports without loading
-the package.
+recreates the clinical and `log2(CPM + 1)` inputs, checks every expression cell
+against the direct library-size formula and again after CSV write/readback, and
+retains an exact byte gate for the clinical table. Expression-file compatibility
+is instead required at fixed six-decimal semantic precision by the non-identifying
+versioned contract in `resources/`; fixed7/fixed8 hashes are diagnostic only.
+The canonical expression size and SHA-256 in `data/source_manifest.tsv` remain
+provenance, not an acceptance gate. Before mapping or within-sample ranking,
+the cohort preparer converts every accepted expression cell to its fixed6
+`ROUND_HALF_UP` value. Thus all accepted CSV renderings enter analysis as the
+same ordered numeric matrix. Because the package stores a legacy `DESeq`
+`CountDataSet`, this one export step requires the pinned legacy environment.
+Use `--verify-only --output-dir data/raw` to check existing exports without
+loading the package; it invokes the same streaming semantic verifier.
 
 Then run the clinical-context scripts in manuscript order:
 

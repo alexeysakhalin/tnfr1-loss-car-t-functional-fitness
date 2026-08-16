@@ -8,6 +8,10 @@ on:
       - "data/source_manifest.tsv"
       - "scripts/fetch_public_sources.py"
       - "scripts/export_imvigor210_inputs.R"
+      - "scripts/verify_imvigor210_expression.py"
+      - "scripts/prepare_open_cohort_analysis_tables.py"
+      - "resources/IMvigor210_expression_semantic_contract_v1.json"
+      - "resources/IMvigor210_fixed6_canonicalization_impact_v1.json"
       - "R/05_figure_4_AB_suppl_S5A.R"
       - "data/experimental/experimental_data_manifest.tsv"
       - "data/experimental/singlecell/**"
@@ -20,6 +24,10 @@ on:
       - "data/source_manifest.tsv"
       - "scripts/fetch_public_sources.py"
       - "scripts/export_imvigor210_inputs.R"
+      - "scripts/verify_imvigor210_expression.py"
+      - "scripts/prepare_open_cohort_analysis_tables.py"
+      - "resources/IMvigor210_expression_semantic_contract_v1.json"
+      - "resources/IMvigor210_fixed6_canonicalization_impact_v1.json"
       - "R/05_figure_4_AB_suppl_S5A.R"
       - "data/experimental/experimental_data_manifest.tsv"
       - "data/experimental/singlecell/**"
@@ -40,6 +48,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12.13"
+
+      - name: Validate the non-identifying semantic framing
+        run: python scripts/verify_imvigor210_expression.py --self-test
 
       - name: Define runner-local working directories
         run: |
@@ -143,7 +154,7 @@ jobs:
           test -z "$(find "$IMVIGOR_R_LIBRARY" \
             -maxdepth 1 -type d -name '00LOCK*' -print -quit)"
 
-      - name: Recreate and checksum-verify both exports
+      - name: Recreate and scientifically verify both exports
         id: imvigor_export
         run: |
           docker run --rm \
@@ -157,18 +168,17 @@ jobs:
             scripts/export_imvigor210_inputs.R \
             --package-tarball /runner-temp/imvigor210-package/IMvigor210CoreBiologies_1.0.0.tar.gz \
             --output-dir /runner-temp/imvigor210-exports \
-            --diagnostics-path /runner-temp/imvigor210-verification/export_diagnostics.tsv
-          docker run --rm \
-            -e R_LIBS=/runner-temp/imvigor210-r-library \
-            -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
-            -v "$GITHUB_WORKSPACE:/workspace" \
-            -v "$RUNNER_TEMP:/runner-temp" \
-            -w /workspace \
-            --entrypoint Rscript \
-            "$IMVIGOR_IMAGE" \
-            scripts/export_imvigor210_inputs.R \
-            --verify-only \
-            --output-dir /runner-temp/imvigor210-exports
+            --diagnostics-path /runner-temp/imvigor210-verification/export_diagnostics.tsv \
+            --external-semantic-file-verification
+          python scripts/verify_imvigor210_expression.py \
+            --input "$IMVIGOR_EXPORT_DIR/IMvigor210_expression_log2CPM.csv" \
+            --contract resources/IMvigor210_expression_semantic_contract_v1.json \
+            --report "$IMVIGOR_DIAGNOSTIC_DIR/expression_semantic_verification.json"
+          test "$(wc -c < "$IMVIGOR_EXPORT_DIR/IMvigor210_clinical.csv")" \
+            = "76315"
+          test "$(sha256sum "$IMVIGOR_EXPORT_DIR/IMvigor210_clinical.csv" \
+            | cut -d ' ' -f 1)" \
+            = "95b04cb21c885f4b49e1f683d95d44e81a4058e1fd24f3cd15630141292210c0"
 
       - name: Record non-identifying verification provenance
         if: always()
