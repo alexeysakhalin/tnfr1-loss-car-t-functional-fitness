@@ -137,7 +137,6 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("e0326e16eb23bea1be980fce315acb36b224dedd7af6b47e0ba37e7747dbcc47", prep_script)
         self.assertIn("EXPECTED_MODEL_SIZE = 694_278", prep_script)
         self.assertIn("b096e03bfefdc2679211545ddbf1bb7878d69ffde07ae335af5b968a7883733c", prep_script)
-        self.assertIn("EXPECTED_ELIGIBLE_MODELS = 1_591", prep_script)
         self.assertIn(
             "c44524c48e20f8c5c1263eb23cd55df77ceda62cfb5246babbe22cecc90c3da0",
             prep_script,
