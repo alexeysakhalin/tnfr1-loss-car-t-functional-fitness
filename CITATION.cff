@@ -3,6 +3,8 @@ message: "If you use this analysis repository, please cite the accompanying manu
 title: "Analysis code for tumor-cell TNFR1 loss and CAR-T functional fitness"
 type: software
 license: MIT
+version: "1.0.0"
+date-released: 2026-08-16
 identifiers:
   - type: doi
     value: "10.5281/zenodo.19707614"
@@ -24,4 +26,4 @@ authors:
     given-names: Alexey
   - family-names: Barlev
     given-names: Nick A
-repository-code: "https://github.com/alexeysakhalin/bayansuluilyassova-car-t_bystander_resistance"
+repository-code: "https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness"

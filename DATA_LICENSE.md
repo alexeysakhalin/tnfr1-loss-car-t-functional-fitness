@@ -2,8 +2,8 @@
 
 Author-generated processed tables under `data/experimental/`, the aggregate
 CheckMate outputs under `data/analysis/`, aggregate results under
-`reference_results/`, gene-set definitions under `resources/` and
-author-generated reference figures are licensed under the Creative Commons
+`reference_results/` and gene-set definitions under `resources/` are licensed
+under the Creative Commons
 Attribution 4.0 International licence (CC BY 4.0):
 
 https://creativecommons.org/licenses/by/4.0/

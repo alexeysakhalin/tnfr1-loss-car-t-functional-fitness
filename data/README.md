@@ -1,7 +1,9 @@
-# Public-cohort data workflow
+# Analysis data and input policy
 
-This repository does not distribute source matrices or sample-level clinical
-tables. They are downloaded or supplied locally, verified against
+Version-controlled experimental tables and non-identifying aggregate results
+are stored under `data/experimental/` and `data/analysis/`. Publisher cohort
+matrices and sample-level clinical tables are not distributed. They are
+downloaded or supplied locally, verified against
 `source_manifest.tsv`, and transformed by deterministic scripts. Only source
 metadata, transformation code, gene-set definitions, aggregate quality-control
 results and aggregate model coefficients are version-controlled.
@@ -189,7 +191,7 @@ described as reformatted and gene-filtered.
 The official combined Supplementary Table workbook is downloaded and verified
 locally. Checksum-verified split S1/S4 copies are accepted as equivalent local
 inputs. The source has no open redistribution licence. Neither the workbook nor
-any sample-level derivative is committed. The primary clinical-context analysis is
+any sample-level derivative is committed. The primary published-cohort analysis is
 restricted to the 181 nivolumab-treated RNA samples (CM-009: 16; CM-010: 45;
 CM-025: 120). Only aggregate coefficients, confidence intervals, multiplicity
 adjustments and QC counts are version-controlled.

@@ -1,4 +1,4 @@
-# Frozen analysis resources
+# Versioned analysis resources
 
 `CAR_T_state_signatures.csv` contains ten fixed C0-C9 expression signatures,
 with 20 positively ranked genes per computational cluster. The membership was
