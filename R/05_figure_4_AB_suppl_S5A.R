@@ -40,11 +40,12 @@
 # - cluster composition analysis
 # - marker gene identification
 #
-# C10 is retained in the complete object and marker/QC exports. It is excluded post-clustering from the
-# C0-C9 state summaries and transferred signatures used in the manuscript.
-# This is an explicit analysis decision, not a sample-level QC exclusion. The
-# repeated-stimulation dataset is clustered and annotated independently; its
-# C0-C5 labels are not mapped onto the tumor-co-culture C0-C5 labels.
+# C10 is retained in the QC-passing object, descriptive Figure 4A-B summaries
+# and marker/QC exports. It is a small cytokine/IFN-responsive cluster outside
+# the historical C0-C9 frozen-signature mapping, not a contaminant or a
+# sample-level QC exclusion. The repeated-stimulation dataset is clustered and
+# annotated independently; its C0-C5 labels are not mapped onto the
+# tumor-co-culture C0-C5 labels.
 #
 # The script generates the following figures:
 # - Figure 4A-B (UMAP and cluster composition)
@@ -67,7 +68,7 @@ install_if_missing <- function(pkgs) {
 
 needed <- c(
   "Matrix", "Seurat", "dplyr", "tidyr", "tibble",
-  "ggplot2", "patchwork", "data.table", "R.utils", "scales", "openxlsx"
+  "ggplot2", "patchwork", "data.table", "R.utils", "scales", "writexl"
 )
 install_if_missing(needed)
 
@@ -81,7 +82,6 @@ suppressPackageStartupMessages({
   library(patchwork)
   library(data.table)
   library(scales)
-  library(openxlsx)
   library(grid)
 })
 
@@ -151,6 +151,45 @@ promote_staged_outputs <- function(staging_dir, final_dir) {
   invisible(relative_paths)
 }
 
+write_marker_workbook <- function(top_markers, path) {
+  marker_table <- as.data.frame(top_markers, stringsAsFactors = FALSE)
+  if (!nrow(marker_table) || !"cluster" %in% colnames(marker_table)) {
+    stop("Marker workbook input must contain rows and a cluster column.")
+  }
+  marker_table[] <- lapply(marker_table, function(column) {
+    if (is.factor(column)) as.character(column) else column
+  })
+  cluster_values <- as.character(marker_table$cluster)
+  if (anyNA(cluster_values) || any(!grepl("^[0-9]+$", cluster_values))) {
+    stop("Marker workbook cluster identifiers must be non-negative integers.")
+  }
+  clusters <- as.character(sort(unique(as.integer(cluster_values))))
+  cluster_counts <- table(factor(cluster_values, levels = clusters))
+  if (any(cluster_counts != 20L)) {
+    stop("Marker workbooks require exactly 20 rows per cluster.")
+  }
+  sheets <- list(All_clusters_top20 = marker_table)
+  for (cluster in clusters) {
+    sheets[[paste0("Cluster_", cluster)]] <- marker_table[
+      cluster_values == cluster,
+      ,
+      drop = FALSE
+    ]
+  }
+  writexl::write_xlsx(
+    sheets,
+    path = path,
+    col_names = TRUE,
+    format_headers = TRUE,
+    use_zip64 = FALSE,
+    constant_memory = FALSE
+  )
+  if (!file.exists(path) || file.info(path)$size <= 0L) {
+    stop("Marker workbook was not written: ", path)
+  }
+  invisible(path)
+}
+
 QC_Q_FEATURE_LOW  <- 0.02
 QC_Q_FEATURE_HIGH <- 0.98
 QC_Q_COUNT_HIGH   <- 0.99
@@ -195,7 +234,7 @@ cluster_labels_full <- c(
   "C7"  = "C7 cycling effector-like",
   "C8"  = "C8 IL9hi TH9-like",
   "C9"  = "C9 TCF7hi stem-like/early-memory",
-  "C10" = "C10 post-clustering excluded cluster"
+  "C10" = "C10 small cytokine/IFN-responsive cluster"
 )
 
 # -----------------------------
@@ -218,7 +257,7 @@ cluster_cols <- c(
   "C7 cycling effector-like"                = "#2A96E6",
   "C8 IL9hi TH9-like"                       = "#A27AE8",
   "C9 TCF7hi stem-like/early-memory"        = "#D865D8",
-  "C10 post-clustering excluded cluster"    = "#E75AA2"
+  "C10 small cytokine/IFN-responsive cluster" = "#E75AA2"
 )
 
 # -----------------------------
@@ -507,18 +546,20 @@ obj$cluster_annot <- factor(
   levels = unname(cluster_labels_full[paste0("C", 0:10)])
 )
 
-# Keep C10 in the complete object and QC outputs, but exclude it from the
-# manuscript's C0-C9 state summaries and transferred signatures. The complete
-# counts below make this decision auditable.
-obj_biological <- subset(obj, subset = cluster_short != "C10")
+# The descriptive single-cell figures and denominators use every QC-passing
+# C0-C10 cell. Only the historical frozen/transferred signature mapping remains
+# restricted to C0-C9. C10 is outside that mapping and is not a contaminant.
+obj_signature_reference <- subset(obj, subset = cluster_short != "C10")
 
-if (ncol(obj_biological) + sum(obj$cluster_short == "C10") != ncol(obj)) {
-  stop("C10 exclusion check failed.")
+if (ncol(obj_signature_reference) + sum(obj$cluster_short == "C10") != ncol(obj)) {
+  stop("C10 frozen-signature partition check failed.")
 }
 
 message(
-  "Cells retained for biological analyses: ", ncol(obj_biological),
-  "; C10 cells excluded: ", sum(obj$cluster_short == "C10")
+  "Cells in historical C0-C9 frozen-signature reference population: ",
+  ncol(obj_signature_reference),
+  "; C10 cells retained descriptively outside the frozen mapping: ",
+  sum(obj$cluster_short == "C10")
 )
 
 # -----------------------------
@@ -618,9 +659,9 @@ save_plot(p_4panel, "Figure_4A_UMAP_4panel.png", w = 17, h = 5)
 # -----------------------------
 # FIGURE 3: UMAP clusters clean
 # -----------------------------
-umap_coordinates <- as.data.frame(Embeddings(obj_biological, "umap"))
+umap_coordinates <- as.data.frame(Embeddings(obj, "umap"))
 colnames(umap_coordinates)[1:2] <- c("umap_1", "umap_2")
-centers <- obj_biological@meta.data %>%
+centers <- obj@meta.data %>%
   tibble::rownames_to_column("cell") %>%
   dplyr::bind_cols(umap_coordinates) %>%
   dplyr::group_by(cluster_short) %>%
@@ -631,7 +672,7 @@ centers <- obj_biological@meta.data %>%
   )
 
 p_clusters_clean <- DimPlot(
-  obj_biological,
+  obj,
   reduction = "umap",
   group.by = "cluster_annot",
   cols = cluster_cols,
@@ -682,12 +723,8 @@ md_all$cluster_full <- factor(
   levels = unname(cluster_labels_full[paste0("C", 0:10)])
 )
 
-md <- md_all %>%
-  dplyr::filter(cluster_short != "C10") %>%
-  dplyr::mutate(
-    cluster_short = droplevels(cluster_short),
-    cluster_full = droplevels(cluster_full)
-  )
+# Descriptive Figure 4B summaries retain all QC-passing C0-C10 cells.
+md <- md_all
 
 df_stack <- md %>%
   dplyr::group_by(sample, cluster_full) %>%
@@ -703,7 +740,7 @@ p_bar_classic <- ggplot(df_stack, aes(x = sample, y = percent, fill = cluster_fu
   labs(
     title = "Descriptive cluster composition by sample",
     x = "Sample",
-    y = "% of C0-C9 QC-passing cells",
+    y = "% of C0-C10 QC-passing cells",
     fill = NULL
   ) +
   theme_classic(base_size = 18) +
@@ -739,7 +776,7 @@ write.csv(
   row.names = FALSE
 )
 
-# Biological table used for Figure 4B and downstream signatures (C10 excluded).
+# Figure 4B count table; its denominator includes every QC-passing C0-C10 cell.
 cluster_cell_counts <- md %>%
   dplyr::group_by(cluster_short, sample) %>%
   dplyr::summarise(n_cells = dplyr::n(), .groups = "drop") %>%
@@ -760,12 +797,13 @@ write.csv(
 # -----------------------------
 # Exploratory cell-level marker rankings. The C0-C9-only run reproduces the
 # comparison population used to freeze the transferred signatures. A separate
-# all-cluster run retains C10-versus-rest evidence for reviewing its
-# post-clustering exclusion. These tests do not constitute biological-replicate
-# inference between experimental groups.
+# all-cluster run retains C10-versus-rest evidence for its neutral descriptive
+# annotation. C10 remains outside the frozen mapping and is not classified as a
+# contaminant. These tests do not constitute biological-replicate inference
+# between experimental groups.
 # -----------------------------
 DefaultAssay(obj) <- "RNA"
-DefaultAssay(obj_biological) <- "RNA"
+DefaultAssay(obj_signature_reference) <- "RNA"
 
 markers_all <- FindAllMarkers(
   obj,
@@ -775,7 +813,7 @@ markers_all <- FindAllMarkers(
   min.pct = 0.1
 )
 if (nrow(markers_all) == 0L) {
-  stop("All-cluster marker table is empty; C10 exclusion cannot be reviewed.")
+  stop("All-cluster marker table is empty; the C10 annotation cannot be reviewed.")
 }
 
 # Keep the aggregate C10 and QC evidence in a stable diagnostic directory even
@@ -828,7 +866,7 @@ data.table::fwrite(
 )
 
 markers <- FindAllMarkers(
-  obj_biological,
+  obj_signature_reference,
   only.pos = TRUE,
   test.use = "wilcox",
   logfc.threshold = 0.25,
@@ -1062,25 +1100,9 @@ if (nrow(markers) > 0) {
       "contract v", contract_metadata$contract_version, "."
     )
 
-    wb <- openxlsx::createWorkbook()
-
-    # summary sheet
-    openxlsx::addWorksheet(wb, "All_clusters_top20")
-    openxlsx::writeData(wb, "All_clusters_top20", top_markers)
-
-    clusters <- sort(unique(top_markers$cluster))
-
-    for (cl in clusters) {
-      df_cl <- top_markers %>% dplyr::filter(cluster == cl)
-      sheet_name <- paste0("Cluster_", cl)
-      openxlsx::addWorksheet(wb, sheet_name)
-      openxlsx::writeData(wb, sheet_name, df_cl)
-    }
-
-    openxlsx::saveWorkbook(
-      wb,
-      file.path(FIG_DIR, "Supplementary_Table_S5_top_markers_per_cluster.xlsx"),
-      overwrite = TRUE
+    write_marker_workbook(
+      top_markers,
+      file.path(FIG_DIR, "Supplementary_Table_S5_top_markers_per_cluster.xlsx")
     )
   } else {
     stop("Could not find avg_log2FC or avg_logFC column in markers table.")
@@ -1111,7 +1133,7 @@ p_bar_facet <- ggplot(df_bar, aes(x = cluster_short, y = frac, fill = sample)) +
   ) +
   labs(
     x = "Cluster",
-    y = "Fraction of cells"
+    y = "Fraction of C0-C10 QC-passing cells"
   ) +
   theme_bw(base_size = 16) +
   theme(
@@ -1170,7 +1192,7 @@ install_if_missing <- function(pkgs) {
 
 needed <- c(
   "Matrix", "Seurat", "dplyr", "tidyr", "tibble",
-  "ggplot2", "patchwork", "data.table", "R.utils", "scales", "openxlsx"
+  "ggplot2", "patchwork", "data.table", "R.utils", "scales", "writexl"
 )
 install_if_missing(needed)
 
@@ -1184,7 +1206,6 @@ suppressPackageStartupMessages({
   library(patchwork)
   library(data.table)
   library(scales)
-  library(openxlsx)
   library(grid)
 })
 
@@ -1453,8 +1474,8 @@ tcr_cluster_labels <- c(
   "C0" = "Mixed activated CD4/KLRB1+ state",
   "C1" = "Cycling T-cell state I",
   "C2" = "Cytokine-producing effector state",
-  "C3" = "Cycling/effector T-cell state II",
-  "C4" = "CD8/TRDC-associated cytotoxic state",
+  "C3" = "CD8/TRDC-associated cytotoxic state",
+  "C4" = "Cycling T-cell state II",
   "C5" = "CCR7/IL7R/HLA-II-associated state"
 )
 
@@ -1503,8 +1524,8 @@ short_umap_labels <- c(
   "Mixed activated\nCD4/KLRB1+",
   "Cycling I",
   "Cytokine-producing\neffector",
-  "Cycling/effector II",
   "CD8/TRDC-associated\ncytotoxic",
+  "Cycling II",
   "CCR7/IL7R/\nHLA-II-associated"
 )
 
@@ -1586,7 +1607,7 @@ p_bar_tcr <- ggplot(df_bar_tcr, aes(x = cluster_annot, y = frac, fill = cluster_
   scale_fill_manual(values = cluster_colors_annot) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   labs(
-    title = "Repeated-stimulation cluster composition",
+    title = "Cluster composition",
     x = "Cluster",
     y = "Fraction of QC-passing cells"
   ) +
@@ -1670,24 +1691,9 @@ if (nrow(markers) > 0) {
       dplyr::slice_max(order_by = .data[[fc_col]], n = 20, with_ties = FALSE) %>%
       dplyr::ungroup()
 
-    wb <- openxlsx::createWorkbook()
-
-    openxlsx::addWorksheet(wb, "All_clusters_top20")
-    openxlsx::writeData(wb, "All_clusters_top20", top_markers)
-
-    clusters <- sort(unique(top_markers$cluster))
-
-    for (cl in clusters) {
-      df_cl <- top_markers %>% dplyr::filter(cluster == cl)
-      sheet_name <- paste0("Cluster_", cl)
-      openxlsx::addWorksheet(wb, sheet_name)
-      openxlsx::writeData(wb, sheet_name, df_cl)
-    }
-
-    openxlsx::saveWorkbook(
-      wb,
-      file.path(FIG_DIR, "Supplementary_Table_TCR_top_markers_per_cluster.xlsx"),
-      overwrite = TRUE
+    write_marker_workbook(
+      top_markers,
+      file.path(FIG_DIR, "Supplementary_Table_TCR_top_markers_per_cluster.xlsx")
     )
   } else {
     stop("Could not find avg_log2FC or avg_logFC column in TCR marker table.")

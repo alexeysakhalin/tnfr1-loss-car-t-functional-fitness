@@ -13,7 +13,7 @@ ICAM1/conjugate experiment is Supplementary Figure S3.
 | Figure 2B | `scripts/run_bulk_rnaseq_pydeseq2.py`; `R/04_figure_2_B_suppl_S2D.R` | complete within-treatment TNFR1-KO1-versus-WT adapters | `figures/figure_2/Figure_2B_triptych.{png,tiff}` |
 | Figure 2C | same workflow | ICAM1 and IRF1 rows from the complete within-treatment adapter | `figures/figure_2/Figure_2C_ICAM1_IRF1_effects.{png,tiff}`; exact estimates in `results/figure_2/Figure_2C_ICAM1_IRF1_effects.tsv` |
 | Supplementary Figure S2D | same workflow | combined four-stratum adapter; Venn uses TNF, IFN-gamma and TNF+IFN-gamma | `figures/figure_2/Supplementary_Figure_S2D_downregulated_overlap.{png,tiff}` |
-| Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R` | `WT_targeted_counts.tsv.gz`, `KO1_targeted_counts.tsv.gz`, `KO2_targeted_counts.tsv.gz`; `resources/CAR_T_state_signature_concordance_v1.csv` | `figures/Figure_4A_UMAP_clusters_annotated.png`; `figures/Figure_4B_cluster_fraction_facet.png` |
+| Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R` | `WT_targeted_counts.tsv.gz`, `KO1_targeted_counts.tsv.gz`, `KO2_targeted_counts.tsv.gz`; `resources/CAR_T_state_signature_concordance_v1.csv` | `figures/Figure_4A_UMAP_clusters_annotated.png`; `figures/Figure_4B_cluster_fraction_facet.png`; descriptive denominator is all QC-passing C0-C10 cells |
 | Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | same WT/KO matrices | `figures/Figure_4A_UMAP_4panel.{png,tiff}` |
 | Figure 5A | `R/05_figure_4_AB_suppl_S5A.R` | `TCR_targeted_counts.tsv.gz`, 5,662 CD3-positive cells | `figures/Figure_5A_TCR_UMAP_clusters.png`; `figures/Figure_5A_TCR_cluster_composition.png` |
 
@@ -31,9 +31,17 @@ marker tables and `sessionInfo()`. Manual cluster labels must be checked against
 the exported marker profiles because numerical cluster identifiers may permute
 between runs. The R/05 release guard requires the exact reviewed C0-C9
 current-only/frozen-only gene pattern in the versioned concordance contract;
-the guard does not use a general overlap threshold. Aggregate C10 marker,
-cluster-count and filtering-QC tables are retained in
+the guard does not use a general overlap threshold. Figure 4A-B retains C10 as
+the neutral `small cytokine/IFN-responsive cluster` in the descriptive C0-C10
+denominator. C10 is outside the historical frozen/transferred C0-C9 mapping and
+is not classified as a contaminant. Aggregate C10 marker, cluster-count and
+filtering-QC tables are retained in
 `results/targeted-singlecell-diagnostics/` even if that guard stops the run.
+Both per-cluster XLSX files must pass the structural and sheet-layout checks in
+[`XLSX_OUTPUT_CONTRACT.md`](XLSX_OUTPUT_CONTRACT.md) before artifact assembly.
+The repeated-stimulation annotation assigns C3 to the
+`CD8/TRDC-associated cytotoxic state` and C4 to `Cycling T-cell state II`;
+these labels are specific to that independently clustered dataset.
 
 ## Clinical-context panels
 

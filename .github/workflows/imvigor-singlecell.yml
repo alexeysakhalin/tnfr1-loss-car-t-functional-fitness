@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
-      IMVIGOR_IMAGE: bioconductor/bioconductor_docker:RELEASE_3_11
+      IMVIGOR_IMAGE: bioconductor/bioconductor_docker:RELEASE_3_11@sha256:cbd868b0543608c917cef2003cc8f051ba15e6633bf941f35802825b1e5551ab
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -47,6 +47,7 @@ jobs:
             echo "IMVIGOR_PACKAGE_DIR=$RUNNER_TEMP/imvigor210-package"
             echo "IMVIGOR_EXPORT_DIR=$RUNNER_TEMP/imvigor210-exports"
             echo "IMVIGOR_R_LIBRARY=$RUNNER_TEMP/imvigor210-r-library"
+            echo "IMVIGOR_DIAGNOSTIC_DIR=$RUNNER_TEMP/imvigor210-verification"
           } >> "$GITHUB_ENV"
 
       - name: Create clean local-only directories
@@ -54,10 +55,12 @@ jobs:
           test ! -e "$IMVIGOR_PACKAGE_DIR"
           test ! -e "$IMVIGOR_EXPORT_DIR"
           test ! -e "$IMVIGOR_R_LIBRARY"
+          test ! -e "$IMVIGOR_DIAGNOSTIC_DIR"
           mkdir -p \
             "$IMVIGOR_PACKAGE_DIR" \
             "$IMVIGOR_EXPORT_DIR" \
-            "$IMVIGOR_R_LIBRARY"
+            "$IMVIGOR_R_LIBRARY" \
+            "$IMVIGOR_DIAGNOSTIC_DIR"
           test -z "$(find "$IMVIGOR_EXPORT_DIR" -mindepth 1 -print -quit)"
 
       - name: Fetch and verify the official processed package
@@ -141,6 +144,7 @@ jobs:
             -maxdepth 1 -type d -name '00LOCK*' -print -quit)"
 
       - name: Recreate and checksum-verify both exports
+        id: imvigor_export
         run: |
           docker run --rm \
             -e R_LIBS=/runner-temp/imvigor210-r-library \
@@ -152,7 +156,8 @@ jobs:
             "$IMVIGOR_IMAGE" \
             scripts/export_imvigor210_inputs.R \
             --package-tarball /runner-temp/imvigor210-package/IMvigor210CoreBiologies_1.0.0.tar.gz \
-            --output-dir /runner-temp/imvigor210-exports
+            --output-dir /runner-temp/imvigor210-exports \
+            --diagnostics-path /runner-temp/imvigor210-verification/export_diagnostics.tsv
           docker run --rm \
             -e R_LIBS=/runner-temp/imvigor210-r-library \
             -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
@@ -166,36 +171,76 @@ jobs:
             --output-dir /runner-temp/imvigor210-exports
 
       - name: Record non-identifying verification provenance
+        if: always()
         run: |
-          mkdir -p results/imvigor210-verification
-          docker image inspect "$IMVIGOR_IMAGE" \
+          IMVIGOR_DIAGNOSTIC_DIR="$RUNNER_TEMP/imvigor210-verification"
+          IMVIGOR_PACKAGE_DIR="${IMVIGOR_PACKAGE_DIR:-$RUNNER_TEMP/imvigor210-package}"
+          IMVIGOR_EXPORT_DIR="${IMVIGOR_EXPORT_DIR:-$RUNNER_TEMP/imvigor210-exports}"
+          mkdir -p "$IMVIGOR_DIAGNOSTIC_DIR"
+          {
+            printf 'workflow_sha\t%s\n' "$GITHUB_SHA"
+            printf 'export_step_outcome\t%s\n' \
+              '${{ steps.imvigor_export.outcome }}'
+          } > "$IMVIGOR_DIAGNOSTIC_DIR/workflow_status.tsv"
+
+          if docker image inspect "$IMVIGOR_IMAGE" \
             --format '{{index .RepoDigests 0}}' \
-            > results/imvigor210-verification/container_image.txt
-          docker run --rm \
-            -e R_LIBS=/runner-temp/imvigor210-r-library \
-            -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
-            -v "$GITHUB_WORKSPACE:/workspace" \
-            -v "$RUNNER_TEMP:/runner-temp" \
-            -w /workspace \
-            --entrypoint Rscript \
-            "$IMVIGOR_IMAGE" \
-            -e 'library_path <- "/runner-temp/imvigor210-r-library"; .libPaths(c(library_path, .libPaths())); packages <- c("DESeq", "Biobase", "edgeR"); stopifnot(all(vapply(packages, requireNamespace, logical(1), quietly = TRUE))); locations <- vapply(packages, find.package, character(1), lib.loc = library_path); stopifnot(all(normalizePath(dirname(locations)) == normalizePath(library_path))); cat("Bioconductor\t", as.character(BiocManager::version()), "\n", sep = ""); cat("library\t", normalizePath(library_path), "\n", sep = ""); for (package in packages) cat(package, "\t", as.character(utils::packageVersion(package)), "\t", locations[[package]], "\n", sep = ""); print(sessionInfo())' \
-            > results/imvigor210-verification/sessionInfo.txt
-          (
-            cd "$IMVIGOR_PACKAGE_DIR"
-            sha256sum IMvigor210CoreBiologies_1.0.0.tar.gz
-          ) > results/imvigor210-verification/package_SHA256SUMS
-          (
-            cd "$IMVIGOR_EXPORT_DIR"
-            sha256sum IMvigor210_clinical.csv IMvigor210_expression_log2CPM.csv
-            wc -c IMvigor210_clinical.csv IMvigor210_expression_log2CPM.csv
-          ) > results/imvigor210-verification/export_checksums_and_sizes.txt
+            > "$IMVIGOR_DIAGNOSTIC_DIR/container_image.txt"; then
+            :
+          else
+            printf 'unavailable\n' \
+              > "$IMVIGOR_DIAGNOSTIC_DIR/container_image.txt"
+          fi
+
+          if test -s \
+            "$IMVIGOR_PACKAGE_DIR/IMvigor210CoreBiologies_1.0.0.tar.gz"; then
+            (
+              cd "$IMVIGOR_PACKAGE_DIR"
+              sha256sum IMvigor210CoreBiologies_1.0.0.tar.gz
+            ) > "$IMVIGOR_DIAGNOSTIC_DIR/package_SHA256SUMS"
+          else
+            printf 'MISSING  IMvigor210CoreBiologies_1.0.0.tar.gz\n' \
+              > "$IMVIGOR_DIAGNOSTIC_DIR/package_SHA256SUMS"
+          fi
+
+          : > "$IMVIGOR_DIAGNOSTIC_DIR/export_checksums_and_sizes.txt"
+          for filename in \
+            IMvigor210_clinical.csv \
+            IMvigor210_expression_log2CPM.csv; do
+            path="$IMVIGOR_EXPORT_DIR/$filename"
+            if test -s "$path"; then
+              sha256sum "$path" \
+                >> "$IMVIGOR_DIAGNOSTIC_DIR/export_checksums_and_sizes.txt"
+              wc -c "$path" \
+                >> "$IMVIGOR_DIAGNOSTIC_DIR/export_checksums_and_sizes.txt"
+            else
+              printf 'MISSING  %s\n' "$filename" \
+                >> "$IMVIGOR_DIAGNOSTIC_DIR/export_checksums_and_sizes.txt"
+            fi
+          done
+
+          if docker run --rm \
+              -e R_LIBS=/runner-temp/imvigor210-r-library \
+              -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
+              -v "$GITHUB_WORKSPACE:/workspace" \
+              -v "$RUNNER_TEMP:/runner-temp" \
+              -w /workspace \
+              --entrypoint Rscript \
+              "$IMVIGOR_IMAGE" \
+              -e 'library_path <- "/runner-temp/imvigor210-r-library"; .libPaths(c(library_path, .libPaths())); packages <- c("DESeq", "Biobase", "edgeR"); stopifnot(all(vapply(packages, requireNamespace, logical(1), quietly = TRUE))); locations <- vapply(packages, find.package, character(1), lib.loc = library_path); stopifnot(all(normalizePath(dirname(locations)) == normalizePath(library_path))); cat("Bioconductor\t", as.character(BiocManager::version()), "\n", sep = ""); cat("library\t", normalizePath(library_path), "\n", sep = ""); for (package in packages) cat(package, "\t", as.character(utils::packageVersion(package)), "\t", locations[[package]], "\n", sep = ""); print(sessionInfo())' \
+              > "$IMVIGOR_DIAGNOSTIC_DIR/sessionInfo.txt"; then
+            :
+          else
+            printf 'sessionInfo unavailable\n' \
+              > "$IMVIGOR_DIAGNOSTIC_DIR/sessionInfo.txt"
+          fi
 
       - name: Upload IMvigor210 verification report only
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: imvigor210-export-verification
-          path: results/imvigor210-verification/
+          path: ${{ runner.temp }}/imvigor210-verification/
           if-no-files-found: error
           retention-days: 14
 
@@ -212,6 +257,9 @@ jobs:
       RSPM: https://packagemanager.posit.co/cran/__linux__/noble/2026-08-14
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12.13"
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.3"
@@ -233,9 +281,12 @@ jobs:
             any::data.table@1.18.4
             any::R.utils@2.13.0
             any::scales@1.4.0
-            any::openxlsx@4.2.8.1
+            any::writexl@2.0.0
           dependencies: '"hard"'
-          cache-version: targeted-singlecell-2026-08-14-v2
+          cache-version: targeted-singlecell-2026-08-16-v3
+
+      - name: Install the pinned XLSX reader used by the release gate
+        run: python -m pip install --disable-pip-version-check --no-input openpyxl==3.1.5
 
       - name: Assert package versions and tracked input checksums
         run: |
@@ -255,7 +306,7 @@ jobs:
             data.table = "1.18.4",
             R.utils = "2.13.0",
             scales = "1.4.0",
-            openxlsx = "4.2.8.1"
+            writexl = "2.0.0"
           )
           observed <- vapply(
             names(expected),
@@ -371,6 +422,18 @@ jobs:
           for filename in "${table_outputs[@]}"; do
             test -s "figures/${filename}"
           done
+          python scripts/verify_xlsx_workbook.py \
+            figures/Supplementary_Table_S5_top_markers_per_cluster.xlsx \
+            --expected-clusters 0,1,2,3,4,5,6,7,8,9 \
+            --top-n 20 \
+            --expected-columns 7 \
+            --require-openpyxl
+          python scripts/verify_xlsx_workbook.py \
+            figures/Supplementary_Table_TCR_top_markers_per_cluster.xlsx \
+            --expected-clusters 0,1,2,3,4,5 \
+            --top-n 20 \
+            --expected-columns 7 \
+            --require-openpyxl
           find figures -maxdepth 1 -type f \
             ! -name 'TCR_seurat_object.rds' \
             -exec cp --target-directory=results/targeted-singlecell-artifact {} +

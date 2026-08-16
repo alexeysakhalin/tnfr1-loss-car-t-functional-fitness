@@ -59,7 +59,7 @@ deactivate
 `renv.lock` records the R environment used by the automated bulk RNA-seq and
 DepMap renderers; it is not a complete lock for the single-cell or clinical
 scripts. The targeted single-cell script additionally requires `Matrix`,
-`Seurat`, `dplyr`, `tidyr`, `tibble`, `patchwork`, `openxlsx`,
+`Seurat`, `dplyr`, `tidyr`, `tibble`, `patchwork`, `writexl`,
 `data.table`, `ggplot2` and `scales`. Clinical-context scripts declare their
 package requirements at the start of each file. Archive `sessionInfo()` with
 each final figure run.
@@ -77,6 +77,10 @@ GitHub Actions runs the same contracts, parses all R scripts and independently
 rebuilds the bulk RNA-seq and DepMap S1B figures. Figure artifacts include PNG,
 600-dpi LZW TIFF, numerical output contracts, source checksums and runtime
 provenance.
+
+The targeted single-cell CI also validates both per-cluster marker workbooks
+before artifact assembly. The sheet, row-count and OOXML integrity contract is
+documented in [`docs/XLSX_OUTPUT_CONTRACT.md`](docs/XLSX_OUTPUT_CONTRACT.md).
 
 ## Bulk RNA-seq
 

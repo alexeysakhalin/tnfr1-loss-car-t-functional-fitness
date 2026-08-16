@@ -24,6 +24,21 @@ EXPECTED_EXPORTS <- list(
   )
 )
 
+# Byte-for-byte CSV identity remains the release gate. This second contract is
+# deliberately insensitive to harmless numeric text formatting: it hashes the
+# complete row-major expression matrix after fixed eight-decimal formatting,
+# while feature and sample identifiers are hashed separately as UTF-8 lines.
+# The expected values were calculated once from the checksum-locked project
+# export. No identifier or expression value is written to diagnostics.
+EXPECTED_EXPRESSION_SEMANTICS <- list(
+  n_rows = 31286L,
+  n_columns = 348L,
+  value_format = "%.8f",
+  row_ids_sha256 = "99c0a222c27bae6c35d479da88aeb8812d5721875f3d5705c5711bffc48c364d",
+  sample_ids_sha256 = "388ef1e09720f61bce1939b15a3b39eec989d415ad590fa07a03dc1ec68619e8",
+  values_sha256 = "da0c1007d1a267f86cb4dbfc0dca85eb8204ef7f2439e60b74ef56eea9d92444"
+)
+
 # write.table/write.csv use scipen when choosing decimal or scientific form.
 # Pin the default used for the canonical exports even if a user profile changes
 # it. OutDec covers any classed numeric columns in the clinical data frame.
@@ -36,7 +51,8 @@ usage <- function(status = 0L) {
       "Usage:\n",
       "  Rscript scripts/export_imvigor210_inputs.R \\\n",
       "    --package-tarball /path/to/IMvigor210CoreBiologies_1.0.0.tar.gz \\\n",
-      "    [--output-dir data/raw]\n",
+      "    [--output-dir data/raw] \\\n",
+      "    [--diagnostics-path /path/to/export_diagnostics.tsv]\n",
       "  Rscript scripts/export_imvigor210_inputs.R --verify-only \\\n",
       "    [--output-dir data/raw]\n"
     ),
@@ -49,6 +65,7 @@ parse_args <- function(args) {
   parsed <- list(
     package_tarball = NULL,
     output_dir = file.path("data", "raw"),
+    diagnostics_path = NULL,
     verify_only = FALSE
   )
   index <- 1L
@@ -59,13 +76,17 @@ parse_args <- function(args) {
     } else if (argument == "--verify-only") {
       parsed$verify_only <- TRUE
       index <- index + 1L
-    } else if (argument %in% c("--package-tarball", "--output-dir")) {
+    } else if (argument %in% c(
+      "--package-tarball", "--output-dir", "--diagnostics-path"
+    )) {
       if (index == length(args)) {
         stop("Missing value after ", argument, call. = FALSE)
       }
       value <- args[[index + 1L]]
       if (argument == "--package-tarball") {
         parsed$package_tarball <- value
+      } else if (argument == "--diagnostics-path") {
+        parsed$diagnostics_path <- value
       } else {
         parsed$output_dir <- value
       }
@@ -122,18 +143,186 @@ sha256_file <- function(path) {
   )
 }
 
+sha256_utf8_lines <- function(values) {
+  if (anyNA(values) || any(grepl("[\r\n]", values))) {
+    stop(
+      "Identifiers for semantic hashing must be non-missing single lines.",
+      call. = FALSE
+    )
+  }
+  path <- tempfile(pattern = "imvigor210-identifiers-", fileext = ".txt")
+  on.exit(unlink(path), add = TRUE)
+  connection <- file(path, open = "wb")
+  tryCatch(
+    for (value in values) {
+      writeBin(charToRaw(enc2utf8(paste0(value, "\n"))), connection)
+    },
+    finally = close(connection)
+  )
+  sha256_file(path)
+}
+
+expression_semantic_diagnostics <- function(value) {
+  if (is.null(rownames(value)) || is.null(colnames(value))) {
+    stop(
+      "Semantic hashing requires feature and sample identifiers.",
+      call. = FALSE
+    )
+  }
+  if (anyNA(value) || any(!is.finite(value))) {
+    stop(
+      "Semantic hashing requires a finite expression matrix.",
+      call. = FALSE
+    )
+  }
+
+  path <- tempfile(pattern = "imvigor210-values-", fileext = ".txt")
+  on.exit(unlink(path), add = TRUE)
+  connection <- file(path, open = "wb")
+  old_numeric_locale <- Sys.getlocale("LC_NUMERIC")
+  on.exit(
+    suppressWarnings(Sys.setlocale("LC_NUMERIC", old_numeric_locale)),
+    add = TRUE
+  )
+  if (is.na(suppressWarnings(Sys.setlocale("LC_NUMERIC", "C")))) {
+    close(connection)
+    stop(
+      "Could not set the C numeric locale for semantic hashing.",
+      call. = FALSE
+    )
+  }
+  tryCatch(
+    for (row_index in seq_len(nrow(value))) {
+      canonical_row <- paste0(
+        paste(
+          sprintf(
+            EXPECTED_EXPRESSION_SEMANTICS$value_format,
+            value[row_index, , drop = TRUE]
+          ),
+          collapse = ","
+        ),
+        "\n"
+      )
+      writeBin(charToRaw(canonical_row), connection)
+    },
+    finally = close(connection)
+  )
+
+  list(
+    n_rows = nrow(value),
+    n_columns = ncol(value),
+    row_ids_sha256 = sha256_utf8_lines(rownames(value)),
+    sample_ids_sha256 = sha256_utf8_lines(colnames(value)),
+    values_sha256 = sha256_file(path)
+  )
+}
+
+verify_expression_semantics <- function(observed) {
+  expected <- c(
+    n_rows = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_rows),
+    n_columns = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_columns),
+    row_ids_sha256 = EXPECTED_EXPRESSION_SEMANTICS$row_ids_sha256,
+    sample_ids_sha256 = EXPECTED_EXPRESSION_SEMANTICS$sample_ids_sha256,
+    values_sha256 = EXPECTED_EXPRESSION_SEMANTICS$values_sha256
+  )
+  observed_vector <- c(
+    n_rows = as.character(observed$n_rows),
+    n_columns = as.character(observed$n_columns),
+    row_ids_sha256 = observed$row_ids_sha256,
+    sample_ids_sha256 = observed$sample_ids_sha256,
+    values_sha256 = observed$values_sha256
+  )
+  mismatched <- names(expected)[observed_vector != expected]
+  if (length(mismatched) > 0L) {
+    stop(
+      "Generated expression semantic contract mismatch: ",
+      paste(mismatched, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  message(
+    "VERIFIED\texpression_semantics\tvalues_sha256=",
+    observed$values_sha256
+  )
+  invisible(TRUE)
+}
+
+write_export_diagnostics <- function(path, staged_paths, expression_semantics) {
+  if (is.null(path)) {
+    return(invisible(NULL))
+  }
+  if (dir.exists(path)) {
+    stop(
+      "--diagnostics-path must name a file, not a directory: ", path,
+      call. = FALSE
+    )
+  }
+  parent <- dirname(path)
+  if (!dir.exists(parent)) {
+    dir.create(parent, recursive = TRUE, showWarnings = FALSE)
+  }
+  if (!dir.exists(parent)) {
+    stop("Could not create diagnostics directory: ", parent, call. = FALSE)
+  }
+
+  clinical_size <- unname(file.info(staged_paths[["clinical"]])$size)
+  expression_size <- unname(file.info(staged_paths[["expression"]])$size)
+  observed <- c(
+    clinical_size_bytes = as.character(clinical_size),
+    clinical_sha256 = sha256_file(staged_paths[["clinical"]]),
+    expression_size_bytes = as.character(expression_size),
+    expression_sha256 = sha256_file(staged_paths[["expression"]]),
+    expression_rows = as.character(expression_semantics$n_rows),
+    expression_columns = as.character(expression_semantics$n_columns),
+    expression_row_ids_sha256 = expression_semantics$row_ids_sha256,
+    expression_sample_ids_sha256 = expression_semantics$sample_ids_sha256,
+    expression_values_8dp_sha256 = expression_semantics$values_sha256
+  )
+  expected <- c(
+    clinical_size_bytes = as.character(EXPECTED_EXPORTS$clinical$size_bytes),
+    clinical_sha256 = EXPECTED_EXPORTS$clinical$sha256,
+    expression_size_bytes = as.character(EXPECTED_EXPORTS$expression$size_bytes),
+    expression_sha256 = EXPECTED_EXPORTS$expression$sha256,
+    expression_rows = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_rows),
+    expression_columns = as.character(EXPECTED_EXPRESSION_SEMANTICS$n_columns),
+    expression_row_ids_sha256 = EXPECTED_EXPRESSION_SEMANTICS$row_ids_sha256,
+    expression_sample_ids_sha256 =
+      EXPECTED_EXPRESSION_SEMANTICS$sample_ids_sha256,
+    expression_values_8dp_sha256 =
+      EXPECTED_EXPRESSION_SEMANTICS$values_sha256
+  )
+  diagnostics <- data.frame(
+    metric = names(observed),
+    observed = unname(observed),
+    expected = unname(expected),
+    match = unname(observed == expected),
+    stringsAsFactors = FALSE
+  )
+  utils::write.table(
+    diagnostics, path, sep = "\t", quote = FALSE,
+    row.names = FALSE, col.names = TRUE, na = ""
+  )
+  message("DIAGNOSTICS\t", normalizePath(path, mustWork = TRUE))
+  invisible(diagnostics)
+}
+
 verify_file <- function(path, specification, label) {
   if (!file.exists(path) || dir.exists(path)) {
     stop(label, " is missing: ", path, call. = FALSE)
   }
   observed_size <- unname(file.info(path)$size)
+  observed_sha256 <- sha256_file(path)
+  message(
+    "OBSERVED\t", label, "\tsize_bytes=", observed_size,
+    "\tsha256=", observed_sha256
+  )
   if (is.na(observed_size) || observed_size != specification$size_bytes) {
     stop(
       label, " size mismatch: ", observed_size, " != ",
-      specification$size_bytes, call. = FALSE
+      specification$size_bytes, "; observed SHA-256: ", observed_sha256,
+      call. = FALSE
     )
   }
-  observed_sha256 <- sha256_file(path)
   if (!identical(observed_sha256, specification$sha256)) {
     stop(
       label, " SHA-256 mismatch: ", observed_sha256, " != ",
@@ -325,6 +514,11 @@ staged_paths <- c(
 write_canonical_csv(clinical, staged_paths[["clinical"]])
 write_canonical_csv(expression_log2cpm, staged_paths[["expression"]])
 
+expression_semantics <- expression_semantic_diagnostics(expression_log2cpm)
+write_export_diagnostics(
+  arguments$diagnostics_path, staged_paths, expression_semantics
+)
+verify_expression_semantics(expression_semantics)
 verify_file(staged_paths[["clinical"]], EXPECTED_EXPORTS$clinical, "generated_clinical")
 verify_file(
   staged_paths[["expression"]], EXPECTED_EXPORTS$expression,

@@ -27,7 +27,11 @@ label. Marker p-values and cluster fractions are therefore descriptive at the
 cell/computational level and do not provide biological-replicate inference or
 absolute viable-cell phenotype frequencies.
 
-R/05 also writes aggregate C10 marker, cluster-count and filtering-QC tables to
+R/05 retains all QC-passing C0-C10 cells in the descriptive Figure 4A-B
+denominator. C10 is reported neutrally as a small cytokine/IFN-responsive
+cluster outside the historical C0-C9 frozen/transferred mapping; it is not
+classified as a contaminant. Aggregate C10 marker, cluster-count and
+filtering-QC tables are written to
 `results/targeted-singlecell-diagnostics/` before the concordance guard. These
 diagnostics remain available if the guard stops a release; no cell-level count
 matrix is copied there.

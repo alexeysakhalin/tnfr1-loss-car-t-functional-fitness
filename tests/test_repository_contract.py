@@ -118,9 +118,29 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn('file(path, open = "wb")', exporter)
         self.assertIn("--package-tarball", exporter)
         self.assertIn("--verify-only", exporter)
+        self.assertIn("--diagnostics-path", exporter)
         self.assertIn(clinical["sha256"], exporter)
         self.assertIn(expression["sha256"], exporter)
         self.assertIn(package["sha256"], exporter)
+        for semantic_digest in (
+            "99c0a222c27bae6c35d479da88aeb8812d5721875f3d5705c5711bffc48c364d",
+            "388ef1e09720f61bce1939b15a3b39eec989d415ad590fa07a03dc1ec68619e8",
+            "da0c1007d1a267f86cb4dbfc0dca85eb8204ef7f2439e60b74ef56eea9d92444",
+        ):
+            self.assertIn(semantic_digest, exporter)
+        self.assertIn('value_format = "%.8f"', exporter)
+        self.assertIn("expression_semantic_diagnostics", exporter)
+        self.assertLess(
+            exporter.index("verify_expression_semantics(expression_semantics)"),
+            exporter.index('verify_file(staged_paths[["clinical"]]'),
+        )
+        self.assertLess(
+            exporter.index("observed_sha256 <- sha256_file(path)"),
+            exporter.index(
+                "if (is.na(observed_size) || "
+                "observed_size != specification$size_bytes)"
+            ),
+        )
         self.assertLess(
             exporter.index("verify_file(package_tarball"),
             exporter.index("utils::untar(package_tarball"),
@@ -623,6 +643,22 @@ class RepositoryContractTests(unittest.TestCase):
                 "Current C0-C9 top-20 marker differences do not match the exact"
             ),
         )
+        self.assertIn('"C10" = "C10 small cytokine/IFN-responsive cluster"', source)
+        self.assertIn("p_clusters_clean <- DimPlot(\n  obj,", source)
+        self.assertNotIn("DimPlot(\n  obj_signature_reference,", source)
+        self.assertIn("# Descriptive Figure 4B summaries retain all QC-passing C0-C10 cells.", source)
+        self.assertIn("md <- md_all", source)
+        self.assertNotIn('dplyr::filter(cluster_short != "C10")', source)
+        self.assertIn('y = "% of C0-C10 QC-passing cells"', source)
+        self.assertIn("FindAllMarkers(\n  obj_signature_reference,", source)
+        self.assertIn("expected_marker_clusters <- as.character(0:9)", source)
+        self.assertIn('"C3" = "CD8/TRDC-associated cytotoxic state"', source)
+        self.assertIn('"C4" = "Cycling T-cell state II"', source)
+        self.assertIn('title = "Cluster composition"', source)
+        self.assertNotIn("Cycling/effector T-cell state II", source)
+        self.assertNotIn("openxlsx", source)
+        self.assertEqual(source.count("writexl::write_xlsx("), 1)
+        self.assertEqual(source.count("write_marker_workbook(\n"), 2)
 
         workflow = (
             ROOT / ".github" / "workflows" / "imvigor-singlecell.yml"
@@ -630,6 +666,15 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("id: targeted_run", workflow)
         self.assertIn("steps.targeted_run.outcome", workflow)
         self.assertIn("results/targeted-singlecell-diagnostics", workflow)
+        self.assertIn("any::writexl@2.0.0", workflow)
+        self.assertIn('writexl = "2.0.0"', workflow)
+        self.assertNotIn("any::openxlsx", workflow)
+        self.assertEqual(workflow.count("python scripts/verify_xlsx_workbook.py"), 2)
+        self.assertIn("openpyxl==3.1.5", workflow)
+        self.assertEqual(workflow.count("--require-openpyxl"), 2)
+        targeted_job = workflow.split("  targeted-singlecell:\n", 1)[1]
+        self.assertIn("uses: actions/setup-python@v6", targeted_job)
+        self.assertIn('python-version: "3.12.13"', targeted_job)
         self.assertEqual(
             workflow.count('"resources/CAR_T_state_signature_concordance_v1.csv"'),
             2,
@@ -660,6 +705,28 @@ class RepositoryContractTests(unittest.TestCase):
         ):
             self.assertIn(f"test -s {relative_path}", install_step)
         self.assertIn("-name '00LOCK*'", install_step)
+        self.assertIn(
+            "bioconductor/bioconductor_docker:RELEASE_3_11@sha256:"
+            "cbd868b0543608c917cef2003cc8f051ba15e6633bf941f35802825b1e5551ab",
+            workflow,
+        )
+        self.assertIn("id: imvigor_export", workflow)
+        self.assertIn("steps.imvigor_export.outcome", workflow)
+        self.assertIn(
+            "--diagnostics-path "
+            "/runner-temp/imvigor210-verification/export_diagnostics.tsv",
+            workflow,
+        )
+        self.assertIn(
+            "path: ${{ runner.temp }}/imvigor210-verification/",
+            workflow,
+        )
+        imvigor_upload = workflow.split(
+            "      - name: Upload IMvigor210 verification report only\n", 1
+        )[1].split("\n\n  targeted-singlecell:", 1)[0]
+        self.assertIn("if: always()", imvigor_upload)
+        self.assertNotIn("IMVIGOR_EXPORT_DIR", imvigor_upload)
+        self.assertNotIn("imvigor210-exports", imvigor_upload)
 
     def test_imvigor_exporter_preserves_named_transaction_paths(self) -> None:
         source = (ROOT / "scripts" / "export_imvigor210_inputs.R").read_text(
