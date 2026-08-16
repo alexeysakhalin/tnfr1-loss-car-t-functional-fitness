@@ -17,7 +17,7 @@ by `data/experimental/experimental_data_manifest.tsv`,
 | Targeted single-cell panels | `data/experimental/singlecell/WT_targeted_counts.tsv.gz`; `KO1_targeted_counts.tsv.gz`; `KO2_targeted_counts.tsv.gz`; `TCR_targeted_counts.tsv.gz` |
 | DepMap S1B direct render | `data/analysis/depmap_s1b_eligible_models.tsv.gz`; preparation QC; source provenance; `reference_results/depmap_s1b_statistics.csv` |
 | CheckMate Figure 5F/S6G | `data/analysis/checkmate_c6_global_gene_models.tsv.gz`; `data/analysis/checkmate_c6_group_balance.tsv` |
-| Fixed analysis resources | `resources/CAR_T_state_signatures.csv`; `resources/Figure_5F_curated_gene_sets.csv`; identifier maps |
+| Fixed analysis resources | `resources/CAR_T_state_signatures.csv`; `resources/CAR_T_state_signature_concordance_v1.csv`; `resources/Figure_5F_curated_gene_sets.csv`; identifier maps |
 
 ## Project source workbooks kept outside GitHub
 

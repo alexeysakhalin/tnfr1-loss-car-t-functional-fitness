@@ -19,7 +19,7 @@ CAR-T phenotypes in patients.
 | `R/` | Figure-generating R scripts and shared plotting/validation functions |
 | `scripts/` | Source acquisition, deterministic table preparation and bulk RNA-seq modelling |
 | `validation/` | Independent CheckMate survival recalculation |
-| `resources/` | Frozen C0-C9 signatures, curated gene sets and identifier mappings |
+| `resources/` | Frozen C0-C9 signatures, the versioned R/05 concordance contract, curated gene sets and identifier mappings |
 | `data/experimental/` | Version-controlled experimental analysis tables and provenance |
 | `data/analysis/` | Aggregate CheckMate results and the compact DepMap S1B derivative |
 | `data/source_manifest.tsv` | Public-source locations, licences, expected filenames, sizes and SHA-256 values |

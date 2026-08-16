@@ -428,6 +428,57 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertNotIn("is.na(.data$padj) | .data$padj < 0.05", helper_text)
         self.assertIn('cox.zph(split_fit, transform = "rank")', helper_text)
 
+    def test_r05_reviewed_signature_concordance_contract_is_exact(self) -> None:
+        contract_path = (
+            ROOT / "resources" / "CAR_T_state_signature_concordance_v1.csv"
+        )
+        self.assertEqual(
+            hashlib.sha256(contract_path.read_bytes()).hexdigest(),
+            "cb41afce9dc85a74a8c027ef764001e0179c144e1debee4cf047f1f49321badc",
+        )
+        rows = read_csv(contract_path)
+        self.assertEqual([row["cluster"] for row in rows], [f"C{i}" for i in range(10)])
+        self.assertEqual(
+            {
+                (
+                    row["contract_version"], row["r_version"],
+                    row["seurat_version"], row["matrix_version"],
+                )
+                for row in rows
+            },
+            {("1", "4.4.3", "5.5.1", "1.7.2")},
+        )
+        expected = {
+            "C0": (20, "", ""),
+            "C1": (18, "FOXP3;TSPAN32", "CD7;DUSP1"),
+            "C2": (17, "CD70;ICOS;IL2RA", "DUSP2;F5;STAT5A"),
+            "C3": (19, "C10ORF54", "IL9R"),
+            "C4": (20, "", ""),
+            "C5": (19, "GZMB", "FASLG"),
+            "C6": (19, "CD4", "HLA-DQA1"),
+            "C7": (18, "ARL4C;IL18RAP", "LIF;TRAT1"),
+            "C8": (20, "", ""),
+            "C9": (20, "", ""),
+        }
+        observed = {
+            row["cluster"]: (
+                int(row["n_overlap"]), row["frozen_only"], row["current_only"]
+            )
+            for row in rows
+        }
+        self.assertEqual(observed, expected)
+        for row in rows:
+            self.assertEqual(int(row["n_frozen"]), 20)
+            self.assertEqual(int(row["n_current"]), 20)
+            self.assertEqual(
+                len([gene for gene in row["frozen_only"].split(";") if gene]),
+                20 - int(row["n_overlap"]),
+            )
+            self.assertEqual(
+                len([gene for gene in row["current_only"].split(";") if gene]),
+                20 - int(row["n_overlap"]),
+            )
+
     def test_checkmate_source_qc(self) -> None:
         path = ROOT / "reference_results" / "source_qc.json"
         qc = json.loads(path.read_text(encoding="utf-8"))
@@ -552,10 +603,24 @@ class RepositoryContractTests(unittest.TestCase):
             source,
         )
         self.assertIn("Supplementary_Table_S5_signature_membership_differences.tsv", source)
+        self.assertIn("CAR_T_state_signature_concordance_v1.csv", source)
+        self.assertIn("reviewed_contract_match", source)
+        self.assertIn("Supplementary_Table_S5_reviewed_concordance_contract.tsv", source)
+        self.assertIn("Supplementary_Table_S5_C10_markers.tsv", source)
+        self.assertIn("Supplementary_Table_S5_cell_counts_all_QC_including_C10.csv", source)
+        self.assertIn("Supplementary_Table_S5_cell_counts_by_cluster.csv", source)
+        self.assertIn("Supplementary_Table_S5_cell_filtering_QC.tsv", source)
+        diagnostic_export = source.index(
+            "# Keep the aggregate C10 and QC evidence in a stable diagnostic directory"
+        )
+        reviewed_guard = source.index(
+            "if (any(is.na(signature_concordance$reviewed_contract_match))"
+        )
+        self.assertLess(diagnostic_export, reviewed_guard)
         self.assertLess(
             source.index("Supplementary_Table_S5_signature_membership_differences.tsv"),
             source.index(
-                "Current C0-C9 top-20 markers do not match the frozen signatures"
+                "Current C0-C9 top-20 marker differences do not match the exact"
             ),
         )
 
@@ -565,12 +630,36 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("id: targeted_run", workflow)
         self.assertIn("steps.targeted_run.outcome", workflow)
         self.assertIn("results/targeted-singlecell-diagnostics", workflow)
+        self.assertEqual(
+            workflow.count('"resources/CAR_T_state_signature_concordance_v1.csv"'),
+            2,
+        )
         self.assertGreaterEqual(workflow.count("if: always()"), 2)
         self.assertGreaterEqual(
             workflow.count("R_LIBS=/runner-temp/imvigor210-r-library"), 4
         )
         self.assertIn("lib = library_path", workflow)
         self.assertIn("find.package(package, lib.loc = library_path)", workflow)
+        install_step = workflow.split(
+            "      - name: Install and assert the legacy top-level packages\n", 1
+        )[1].split(
+            "      - name: Recreate and checksum-verify both exports\n", 1
+        )[0]
+        self.assertIn("docker run --rm -i \\", install_step)
+        self.assertIn("for package in DESeq Biobase edgeR; do", install_step)
+        self.assertIn('package_dir="$IMVIGOR_R_LIBRARY/$package"', install_step)
+        self.assertIn('test -d "$package_dir"', install_step)
+        self.assertGreater(
+            install_step.index("for package in DESeq Biobase edgeR; do"),
+            install_step.index("\n          RSCRIPT\n"),
+        )
+        for relative_path in (
+            '"$package_dir/DESCRIPTION"',
+            '"$package_dir/NAMESPACE"',
+            '"$package_dir/Meta/package.rds"',
+        ):
+            self.assertIn(f"test -s {relative_path}", install_step)
+        self.assertIn("-name '00LOCK*'", install_step)
 
     def test_imvigor_exporter_preserves_named_transaction_paths(self) -> None:
         source = (ROOT / "scripts" / "export_imvigor210_inputs.R").read_text(

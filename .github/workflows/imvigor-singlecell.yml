@@ -12,6 +12,7 @@ on:
       - "data/experimental/experimental_data_manifest.tsv"
       - "data/experimental/singlecell/**"
       - "resources/CAR_T_state_signatures.csv"
+      - "resources/CAR_T_state_signature_concordance_v1.csv"
   push:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - "data/experimental/experimental_data_manifest.tsv"
       - "data/experimental/singlecell/**"
       - "resources/CAR_T_state_signatures.csv"
+      - "resources/CAR_T_state_signature_concordance_v1.csv"
 
 permissions:
   contents: read
@@ -75,7 +77,7 @@ jobs:
 
       - name: Install and assert the legacy top-level packages
         run: |
-          docker run --rm \
+          docker run --rm -i \
             -e R_LIBS=/runner-temp/imvigor210-r-library \
             -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
             -v "$GITHUB_WORKSPACE:/workspace" \
@@ -128,6 +130,15 @@ jobs:
             )
           )
           RSCRIPT
+          for package in DESeq Biobase edgeR; do
+            package_dir="$IMVIGOR_R_LIBRARY/$package"
+            test -d "$package_dir"
+            test -s "$package_dir/DESCRIPTION"
+            test -s "$package_dir/NAMESPACE"
+            test -s "$package_dir/Meta/package.rds"
+          done
+          test -z "$(find "$IMVIGOR_R_LIBRARY" \
+            -maxdepth 1 -type d -name '00LOCK*' -print -quit)"
 
       - name: Recreate and checksum-verify both exports
         run: |

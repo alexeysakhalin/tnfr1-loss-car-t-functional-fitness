@@ -777,6 +777,35 @@ markers_all <- FindAllMarkers(
 if (nrow(markers_all) == 0L) {
   stop("All-cluster marker table is empty; C10 exclusion cannot be reviewed.")
 }
+
+# Keep the aggregate C10 and QC evidence in a stable diagnostic directory even
+# when a later release guard stops the script. No cell-level matrix is copied
+# to this directory.
+dir.create(DIAGNOSTIC_DIR, recursive = TRUE, showWarnings = FALSE)
+data.table::fwrite(
+  markers_all %>% dplyr::filter(as.character(.data$cluster) == "10"),
+  file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_C10_markers.tsv"),
+  sep = "\t"
+)
+write.csv(
+  cluster_cell_counts_all_qc,
+  file.path(
+    DIAGNOSTIC_DIR,
+    "Supplementary_Table_S5_cell_counts_all_QC_including_C10.csv"
+  ),
+  row.names = FALSE
+)
+write.csv(
+  cluster_cell_counts,
+  file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_cell_counts_by_cluster.csv"),
+  row.names = FALSE
+)
+data.table::fwrite(
+  qc_summary,
+  file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_cell_filtering_QC.tsv"),
+  sep = "\t"
+)
+
 marker_counts_all <- markers_all %>%
   dplyr::mutate(cluster = as.character(.data$cluster)) %>%
   dplyr::count(.data$cluster, name = "n_markers")
@@ -841,71 +870,171 @@ if (nrow(markers) > 0) {
         cluster = paste0("C", as.character(.data$cluster)),
         gene = toupper(trimws(as.character(.data$gene)))
       )
-    signature_concordance <- dplyr::bind_rows(lapply(paste0("C", 0:9), function(cl) {
-      frozen_genes <- frozen_signatures$gene[frozen_signatures$cluster == cl]
-      current_genes <- current_membership$gene[current_membership$cluster == cl]
-      dplyr::tibble(
-        cluster = cl,
-        n_frozen = length(frozen_genes),
-        n_current = length(current_genes),
-        n_overlap = length(intersect(frozen_genes, current_genes)),
-        exact_membership_match = setequal(frozen_genes, current_genes)
+    reviewed_contract_path <- file.path(
+      "resources", "CAR_T_state_signature_concordance_v1.csv"
+    )
+    reviewed_contract <- data.table::fread(
+      reviewed_contract_path, data.table = FALSE
+    )
+    required_contract_columns <- c(
+      "contract_version", "r_version", "seurat_version", "matrix_version",
+      "cluster", "n_frozen", "n_current", "n_overlap", "frozen_only",
+      "current_only"
+    )
+    if (!identical(colnames(reviewed_contract), required_contract_columns)) {
+      stop(
+        "The reviewed C0-C9 concordance contract has an unexpected schema: ",
+        reviewed_contract_path
       )
-    }))
+    }
+
+    normalize_gene_list <- function(values) {
+      vapply(values, function(value) {
+        if (is.na(value) || !nzchar(trimws(as.character(value)))) return("")
+        genes <- unlist(strsplit(toupper(as.character(value)), ";", fixed = TRUE))
+        genes <- sort(trimws(genes[nzchar(trimws(genes))]))
+        if (anyDuplicated(genes)) {
+          stop("The reviewed concordance contract contains a duplicate gene.")
+        }
+        paste(genes, collapse = ";")
+      }, character(1))
+    }
+
+    reviewed_contract <- reviewed_contract %>%
+      dplyr::transmute(
+        contract_version = as.character(.data$contract_version),
+        r_version = as.character(.data$r_version),
+        seurat_version = as.character(.data$seurat_version),
+        matrix_version = as.character(.data$matrix_version),
+        cluster = as.character(.data$cluster),
+        n_frozen = as.integer(.data$n_frozen),
+        n_current = as.integer(.data$n_current),
+        n_overlap = as.integer(.data$n_overlap),
+        frozen_only = normalize_gene_list(.data$frozen_only),
+        current_only = normalize_gene_list(.data$current_only)
+      ) %>%
+      dplyr::arrange(factor(.data$cluster, levels = paste0("C", 0:9)))
+
+    expected_contract_clusters <- paste0("C", 0:9)
+    if (!identical(reviewed_contract$cluster, expected_contract_clusters) ||
+        anyDuplicated(reviewed_contract$cluster)) {
+      stop("The reviewed concordance contract must contain one row for each C0-C9 cluster.")
+    }
+    contract_metadata <- reviewed_contract %>%
+      dplyr::distinct(
+        .data$contract_version, .data$r_version, .data$seurat_version,
+        .data$matrix_version
+      )
+    if (nrow(contract_metadata) != 1L || contract_metadata$contract_version != "1") {
+      stop("The reviewed concordance contract metadata is inconsistent or unsupported.")
+    }
+    runtime_versions <- c(
+      r_version = paste(R.version$major, R.version$minor, sep = "."),
+      seurat_version = as.character(utils::packageVersion("Seurat")),
+      matrix_version = as.character(utils::packageVersion("Matrix"))
+    )
+    expected_versions <- c(
+      r_version = contract_metadata$r_version,
+      seurat_version = contract_metadata$seurat_version,
+      matrix_version = contract_metadata$matrix_version
+    )
+    if (!identical(runtime_versions, expected_versions)) {
+      stop(
+        "The R/05 release environment does not match concordance contract v1. ",
+        "Observed: ", paste(names(runtime_versions), runtime_versions, collapse = ", "),
+        "; expected: ", paste(names(expected_versions), expected_versions, collapse = ", "),
+        "."
+      )
+    }
+
+    signature_concordance <- dplyr::bind_rows(lapply(
+      expected_contract_clusters,
+      function(cl) {
+        frozen_genes <- sort(unique(
+          frozen_signatures$gene[frozen_signatures$cluster == cl]
+        ))
+        current_genes <- sort(unique(
+          current_membership$gene[current_membership$cluster == cl]
+        ))
+        dplyr::tibble(
+          cluster = cl,
+          n_frozen = length(frozen_genes),
+          n_current = length(current_genes),
+          n_overlap = length(intersect(frozen_genes, current_genes)),
+          frozen_only = paste(sort(setdiff(frozen_genes, current_genes)), collapse = ";"),
+          current_only = paste(sort(setdiff(current_genes, frozen_genes)), collapse = ";"),
+          exact_membership_match = setequal(frozen_genes, current_genes)
+        )
+      }
+    ))
+    signature_concordance$reviewed_contract_match <-
+      signature_concordance$n_frozen == reviewed_contract$n_frozen &
+      signature_concordance$n_current == reviewed_contract$n_current &
+      signature_concordance$n_overlap == reviewed_contract$n_overlap &
+      signature_concordance$frozen_only == reviewed_contract$frozen_only &
+      signature_concordance$current_only == reviewed_contract$current_only
+    signature_concordance$contract_version <- contract_metadata$contract_version
     data.table::fwrite(
       signature_concordance,
       file.path(FIG_DIR, "Supplementary_Table_S5_signature_concordance.tsv"),
       sep = "\t"
     )
-    if (any(!signature_concordance$exact_membership_match)) {
-      mismatched_clusters <- signature_concordance$cluster[
-        !signature_concordance$exact_membership_match
-      ]
-      signature_differences <- dplyr::bind_rows(lapply(
-        mismatched_clusters,
-        function(cl) {
-          frozen_genes <- frozen_signatures$gene[frozen_signatures$cluster == cl]
-          current_genes <- current_membership$gene[current_membership$cluster == cl]
-          frozen_only <- sort(setdiff(frozen_genes, current_genes))
-          current_only <- sort(setdiff(current_genes, frozen_genes))
-          dplyr::bind_rows(
-            dplyr::tibble(
-              cluster = rep(cl, length(frozen_only)),
-              membership = rep("frozen_only", length(frozen_only)),
-              gene = frozen_only
-            ),
-            dplyr::tibble(
-              cluster = rep(cl, length(current_only)),
-              membership = rep("current_only", length(current_only)),
-              gene = current_only
-            )
+    signature_differences <- dplyr::bind_rows(lapply(
+      expected_contract_clusters,
+      function(cl) {
+        frozen_genes <- frozen_signatures$gene[frozen_signatures$cluster == cl]
+        current_genes <- current_membership$gene[current_membership$cluster == cl]
+        frozen_only <- sort(setdiff(frozen_genes, current_genes))
+        current_only <- sort(setdiff(current_genes, frozen_genes))
+        dplyr::bind_rows(
+          dplyr::tibble(
+            cluster = rep(cl, length(frozen_only)),
+            membership = rep("frozen_only", length(frozen_only)),
+            gene = frozen_only
+          ),
+          dplyr::tibble(
+            cluster = rep(cl, length(current_only)),
+            membership = rep("current_only", length(current_only)),
+            gene = current_only
           )
-        }
-      ))
-      dir.create(DIAGNOSTIC_DIR, recursive = TRUE, showWarnings = FALSE)
-      data.table::fwrite(
-        signature_concordance,
-        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_signature_concordance.tsv"),
-        sep = "\t"
-      )
-      data.table::fwrite(
-        top_markers,
-        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_current_top20_markers.tsv"),
-        sep = "\t"
-      )
-      data.table::fwrite(
-        frozen_signatures,
-        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_frozen_signatures.tsv"),
-        sep = "\t"
-      )
-      data.table::fwrite(
-        signature_differences,
-        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_signature_membership_differences.tsv"),
-        sep = "\t"
-      )
+        )
+      }
+    ))
+    data.table::fwrite(
+      signature_concordance,
+      file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_signature_concordance.tsv"),
+      sep = "\t"
+    )
+    data.table::fwrite(
+      top_markers,
+      file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_current_top20_markers.tsv"),
+      sep = "\t"
+    )
+    data.table::fwrite(
+      frozen_signatures,
+      file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_frozen_signatures.tsv"),
+      sep = "\t"
+    )
+    data.table::fwrite(
+      signature_differences,
+      file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_signature_membership_differences.tsv"),
+      sep = "\t"
+    )
+    data.table::fwrite(
+      reviewed_contract,
+      file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_reviewed_concordance_contract.tsv"),
+      sep = "\t"
+    )
+
+    if (any(is.na(signature_concordance$reviewed_contract_match)) ||
+        any(!signature_concordance$reviewed_contract_match)) {
+      unexpected_clusters <- signature_concordance$cluster[
+        is.na(signature_concordance$reviewed_contract_match) |
+          !signature_concordance$reviewed_contract_match
+      ]
       message("C0-C9 frozen-signature concordance:")
       print(as.data.frame(signature_concordance), row.names = FALSE)
-      for (cl in mismatched_clusters) {
+      for (cl in unexpected_clusters) {
         cluster_differences <- signature_differences[
           signature_differences$cluster == cl,
           ,
@@ -922,11 +1051,16 @@ if (nrow(markers) > 0) {
         }
       }
       stop(
-        "Current C0-C9 top-20 markers do not match the frozen signatures; ",
-        "manual marker/label review is required before figure release. ",
+        "Current C0-C9 top-20 marker differences do not match the exact ",
+        "reviewed concordance contract v1; manual marker/label review is ",
+        "required before figure release. ",
         "Diagnostic tables were written to ", DIAGNOSTIC_DIR, "."
       )
     }
+    message(
+      "Current C0-C9 top-20 marker differences match reviewed concordance ",
+      "contract v", contract_metadata$contract_version, "."
+    )
 
     wb <- openxlsx::createWorkbook()
 

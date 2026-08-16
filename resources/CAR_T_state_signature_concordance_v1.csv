@@ -1,0 +1,11 @@
+contract_version,r_version,seurat_version,matrix_version,cluster,n_frozen,n_current,n_overlap,frozen_only,current_only
+1,4.4.3,5.5.1,1.7.2,C0,20,20,20,,
+1,4.4.3,5.5.1,1.7.2,C1,20,20,18,FOXP3;TSPAN32,CD7;DUSP1
+1,4.4.3,5.5.1,1.7.2,C2,20,20,17,CD70;ICOS;IL2RA,DUSP2;F5;STAT5A
+1,4.4.3,5.5.1,1.7.2,C3,20,20,19,C10ORF54,IL9R
+1,4.4.3,5.5.1,1.7.2,C4,20,20,20,,
+1,4.4.3,5.5.1,1.7.2,C5,20,20,19,GZMB,FASLG
+1,4.4.3,5.5.1,1.7.2,C6,20,20,19,CD4,HLA-DQA1
+1,4.4.3,5.5.1,1.7.2,C7,20,20,18,ARL4C;IL18RAP,LIF;TRAT1
+1,4.4.3,5.5.1,1.7.2,C8,20,20,20,,
+1,4.4.3,5.5.1,1.7.2,C9,20,20,20,,
