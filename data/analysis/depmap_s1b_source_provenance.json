@@ -14,8 +14,8 @@
     "compression": "gzip level 9; mtime 0; no original filename",
     "filename": "depmap_s1b_eligible_models.tsv.gz",
     "rows": 1591,
-    "sha256": "34e8b46cca3c7a4bd20db518affcc99e9614b7ecd7cdf0112be5271e76ad2529",
-    "size_bytes": 40212,
+    "sha256": "368ad92b085a722d3984a5355bea3109d8e5a2b29ffe563c3fd284cf8970f354",
+    "size_bytes": 47514,
     "sort_order": [
       "ModelID"
     ]
@@ -29,15 +29,21 @@
   "release_pair_status": "unverified",
   "same_release_pair": null,
   "source_files": {
-    "expression_csv": {
-      "filename": "OmicsExpressionProteinCodingGenesTPMLogp1.csv",
-      "sha256": "e0326e16eb23bea1be980fce315acb36b224dedd7af6b47e0ba37e7747dbcc47",
-      "size_bytes": 521526607
+    "expression_archive": {
+      "filename": "OmicsExpressionTPMLogp1HumanProteinCodingGenes.zip",
+      "sha256": "c44524c48e20f8c5c1263eb23cd55df77ceda62cfb5246babbe22cecc90c3da0",
+      "size_bytes": 249426032
+    },
+    "expression_member": {
+      "filename": "OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv",
+      "sha256": "90bfdbe5c44cbb8f822e655ba7f179f3033933116285b6b2f85153b2d3d17c75",
+      "size_bytes": 538420733
     },
     "model_metadata": {
       "filename": "Model.csv",
-      "sha256": "b096e03bfefdc2679211545ddbf1bb7878d69ffde07ae335af5b968a7883733c",
-      "size_bytes": 694278
+      "md5": "af4472ab734ea3aec974d992b504c7e5",
+      "sha256": "9dbb9de8805696c1345816ab07edd23fb4fd95e117739f3c5c3b1cf062c1233b",
+      "size_bytes": 699474
     }
   },
   "tissue_origin_filter_applied": false

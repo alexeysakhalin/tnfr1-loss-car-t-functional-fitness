@@ -27,6 +27,12 @@ out_dir <- Sys.getenv(
 )
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
+expected_sizes <- c(
+  input = 47514,
+  qc = 1583,
+  source_provenance = 1895,
+  summary = 305
+)
 tracked_files <- c(
   input = input_file,
   qc = qc_file,
@@ -37,12 +43,14 @@ missing_files <- tracked_files[!file.exists(tracked_files)]
 if (length(missing_files)) {
   stop("Missing tracked S1B input: ", unname(missing_files[[1]]))
 }
-
-# The Python preparation contract checksum-pins the direct DepMap 25Q2 source
-# files. Derived JSON/TSV byte sizes can differ from the legacy ZIP workflow
-# even when the locked biological contract is identical, so this renderer
-# validates schema, row count, identifiers, threshold flags and all six counts
-# below instead of relying on fragile derived-file byte sizes.
+observed_sizes <- vapply(
+  tracked_files,
+  function(path) unname(file.info(path)$size),
+  numeric(1)
+)
+if (!identical(as.numeric(observed_sizes), as.numeric(expected_sizes))) {
+  stop("A tracked S1B input has an unexpected byte size.")
+}
 
 # This state is intentionally not configurable at render time. Source hashes,
 # release status and same-release=null are checked by the Python preparation

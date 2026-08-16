@@ -166,12 +166,6 @@ UMAP_DIMS         <- 1:20
 UMAP_N_NEIGHBORS  <- 30
 UMAP_MIN_DIST     <- 0.3
 
-# Marker ranks at the top-20 boundary can change by one gene across Seurat
-# releases because of small numerical changes in fold-change estimates. Keep
-# the frozen signatures authoritative and require at least 95% membership
-# concordance in every C0-C9 cluster before releasing figures.
-MIN_SIGNATURE_OVERLAP <- 19L
-
 # -----------------------------
 # Cluster labels
 # -----------------------------
@@ -847,18 +841,14 @@ if (nrow(markers) > 0) {
         gene = toupper(trimws(as.character(.data$gene)))
       )
     signature_concordance <- dplyr::bind_rows(lapply(paste0("C", 0:9), function(cl) {
-      frozen_genes <- sort(unique(frozen_signatures$gene[frozen_signatures$cluster == cl]))
-      current_genes <- sort(unique(current_membership$gene[current_membership$cluster == cl]))
+      frozen_genes <- frozen_signatures$gene[frozen_signatures$cluster == cl]
+      current_genes <- current_membership$gene[current_membership$cluster == cl]
       dplyr::tibble(
         cluster = cl,
         n_frozen = length(frozen_genes),
         n_current = length(current_genes),
         n_overlap = length(intersect(frozen_genes, current_genes)),
-        exact_membership_match = setequal(frozen_genes, current_genes),
-        release_guard_pass = length(intersect(frozen_genes, current_genes)) >=
-          MIN_SIGNATURE_OVERLAP,
-        frozen_only = paste(setdiff(frozen_genes, current_genes), collapse = ";"),
-        current_only = paste(setdiff(current_genes, frozen_genes), collapse = ";")
+        exact_membership_match = setequal(frozen_genes, current_genes)
       )
     }))
     data.table::fwrite(
@@ -866,30 +856,10 @@ if (nrow(markers) > 0) {
       file.path(FIG_DIR, "Supplementary_Table_S5_signature_concordance.tsv"),
       sep = "\t"
     )
-    if (any(!signature_concordance$release_guard_pass)) {
-      diagnostic_dir <- file.path("results", "R05_diagnostics")
-      dir.create(diagnostic_dir, recursive = TRUE, showWarnings = FALSE)
-      data.table::fwrite(
-        signature_concordance,
-        file.path(diagnostic_dir, "signature_concordance.tsv"),
-        sep = "\t"
-      )
-      data.table::fwrite(
-        top_markers,
-        file.path(diagnostic_dir, "current_top20_markers.tsv.gz"),
-        sep = "\t"
-      )
-      stop(
-        "One or more C0-C9 clusters have fewer than 19/20 frozen top markers; ",
-        "diagnostics were written to results/R05_diagnostics; ",
-        "manual marker/label review is required before figure release."
-      )
-    }
     if (any(!signature_concordance$exact_membership_match)) {
-      warning(
-        "Top-20 marker membership is not exact in every cluster, but all ",
-        "clusters retain at least 19/20 frozen markers; frozen signatures ",
-        "remain authoritative and the release guard passed."
+      stop(
+        "Current C0-C9 top-20 markers do not match the frozen signatures; ",
+        "manual marker/label review is required before figure release."
       )
     }
 
