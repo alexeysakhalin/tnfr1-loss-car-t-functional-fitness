@@ -100,6 +100,7 @@ FILES <- c(
 # only after both marker/annotation guards have passed.
 # -----------------------------
 FINAL_FIG_DIR <- "figures"
+DIAGNOSTIC_DIR <- file.path("results", "targeted-singlecell-diagnostics")
 FIG_DIR <- tempfile(pattern = "R05-staging-", tmpdir = tempdir())
 if (!dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)) {
   stop("Could not create the R/05 staging directory: ", FIG_DIR)
@@ -857,9 +858,73 @@ if (nrow(markers) > 0) {
       sep = "\t"
     )
     if (any(!signature_concordance$exact_membership_match)) {
+      mismatched_clusters <- signature_concordance$cluster[
+        !signature_concordance$exact_membership_match
+      ]
+      signature_differences <- dplyr::bind_rows(lapply(
+        mismatched_clusters,
+        function(cl) {
+          frozen_genes <- frozen_signatures$gene[frozen_signatures$cluster == cl]
+          current_genes <- current_membership$gene[current_membership$cluster == cl]
+          frozen_only <- sort(setdiff(frozen_genes, current_genes))
+          current_only <- sort(setdiff(current_genes, frozen_genes))
+          dplyr::bind_rows(
+            dplyr::tibble(
+              cluster = rep(cl, length(frozen_only)),
+              membership = rep("frozen_only", length(frozen_only)),
+              gene = frozen_only
+            ),
+            dplyr::tibble(
+              cluster = rep(cl, length(current_only)),
+              membership = rep("current_only", length(current_only)),
+              gene = current_only
+            )
+          )
+        }
+      ))
+      dir.create(DIAGNOSTIC_DIR, recursive = TRUE, showWarnings = FALSE)
+      data.table::fwrite(
+        signature_concordance,
+        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_signature_concordance.tsv"),
+        sep = "\t"
+      )
+      data.table::fwrite(
+        top_markers,
+        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_current_top20_markers.tsv"),
+        sep = "\t"
+      )
+      data.table::fwrite(
+        frozen_signatures,
+        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_frozen_signatures.tsv"),
+        sep = "\t"
+      )
+      data.table::fwrite(
+        signature_differences,
+        file.path(DIAGNOSTIC_DIR, "Supplementary_Table_S5_signature_membership_differences.tsv"),
+        sep = "\t"
+      )
+      message("C0-C9 frozen-signature concordance:")
+      print(as.data.frame(signature_concordance), row.names = FALSE)
+      for (cl in mismatched_clusters) {
+        cluster_differences <- signature_differences[
+          signature_differences$cluster == cl,
+          ,
+          drop = FALSE
+        ]
+        for (membership in c("frozen_only", "current_only")) {
+          genes <- cluster_differences$gene[
+            cluster_differences$membership == membership
+          ]
+          message(
+            cl, " ", membership, ": ",
+            if (length(genes)) paste(genes, collapse = ", ") else "<none>"
+          )
+        }
+      }
       stop(
         "Current C0-C9 top-20 markers do not match the frozen signatures; ",
-        "manual marker/label review is required before figure release."
+        "manual marker/label review is required before figure release. ",
+        "Diagnostic tables were written to ", DIAGNOSTIC_DIR, "."
       )
     }
 

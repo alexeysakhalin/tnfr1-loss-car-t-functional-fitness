@@ -11,6 +11,7 @@ ICAM1/conjugate experiment is Supplementary Figure S3.
 | Figure 1B | `scripts/run_bulk_rnaseq_pydeseq2.py`; `R/03_figure_1_B_C.R` | `data/experimental/bulk_rnaseq/`; complete WT cytokine adapters | `figures/figure_1/Figure_1B_triptych.{png,tiff}` |
 | Figure 1C | same workflow | complete WT cytokine adapters | `figures/figure_1/Figure_1C_upregulated_overlap.{png,tiff}` |
 | Figure 2B | `scripts/run_bulk_rnaseq_pydeseq2.py`; `R/04_figure_2_B_suppl_S2D.R` | complete within-treatment TNFR1-KO1-versus-WT adapters | `figures/figure_2/Figure_2B_triptych.{png,tiff}` |
+| Figure 2C | same workflow | ICAM1 and IRF1 rows from the complete within-treatment adapter | `figures/figure_2/Figure_2C_ICAM1_IRF1_effects.{png,tiff}`; exact estimates in `results/figure_2/Figure_2C_ICAM1_IRF1_effects.tsv` |
 | Supplementary Figure S2D | same workflow | combined four-stratum adapter; Venn uses TNF, IFN-gamma and TNF+IFN-gamma | `figures/figure_2/Supplementary_Figure_S2D_downregulated_overlap.{png,tiff}` |
 | Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R` | `WT_targeted_counts.tsv.gz`, `KO1_targeted_counts.tsv.gz`, `KO2_targeted_counts.tsv.gz` | `figures/Figure_4A_UMAP_clusters_annotated.png`; `figures/Figure_4B_cluster_fraction_facet.png` |
 | Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | same WT/KO matrices | `figures/Figure_4A_UMAP_4panel.{png,tiff}` |
@@ -19,8 +20,11 @@ ICAM1/conjugate experiment is Supplementary Figure S3.
 The bulk panels use complete regenerated result universes. Figure 1B/1C DEG
 sets require baseMean >=30, adjusted P <0.05 and the stated fold-change
 threshold. Figure 2B uses within-treatment TNFR1-KO1-versus-WT contrasts, not
-the genotype-by-treatment interaction coefficients. Source label `T6` maps to
-manuscript clone `TNFR1-KO1`.
+the genotype-by-treatment interaction coefficients. Figure 2C shows the same
+within-treatment model estimates for ICAM1 and IRF1 with unadjusted 95% Wald
+confidence intervals and within-contrast BH-adjusted P values; it contains no
+between-treatment tests. Source label `T6` maps to manuscript clone
+`TNFR1-KO1`.
 
 For the targeted single-cell panels, archive before/after QC counts, nonempty
 marker tables and `sessionInfo()`. Manual cluster labels must be checked against

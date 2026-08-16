@@ -547,6 +547,30 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertGreater(last_guard, -1)
         self.assertGreater(promotion, last_guard)
         self.assertGreater(promotion, source.rfind("saveRDS(obj"))
+        self.assertIn(
+            'DIAGNOSTIC_DIR <- file.path("results", "targeted-singlecell-diagnostics")',
+            source,
+        )
+        self.assertIn("Supplementary_Table_S5_signature_membership_differences.tsv", source)
+        self.assertLess(
+            source.index("Supplementary_Table_S5_signature_membership_differences.tsv"),
+            source.index(
+                "Current C0-C9 top-20 markers do not match the frozen signatures"
+            ),
+        )
+
+        workflow = (
+            ROOT / ".github" / "workflows" / "imvigor-singlecell.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("id: targeted_run", workflow)
+        self.assertIn("steps.targeted_run.outcome", workflow)
+        self.assertIn("results/targeted-singlecell-diagnostics", workflow)
+        self.assertGreaterEqual(workflow.count("if: always()"), 2)
+        self.assertGreaterEqual(
+            workflow.count("R_LIBS=/runner-temp/imvigor210-r-library"), 4
+        )
+        self.assertIn("lib = library_path", workflow)
+        self.assertIn("find.package(package, lib.loc = library_path)", workflow)
 
     def test_imvigor_exporter_preserves_named_transaction_paths(self) -> None:
         source = (ROOT / "scripts" / "export_imvigor210_inputs.R").read_text(

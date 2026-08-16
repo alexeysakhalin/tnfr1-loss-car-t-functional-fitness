@@ -1,4 +1,4 @@
-# Figure 2B and Supplementary Figure S2D: TNFR1-KO1 versus WT.
+# Figure 2B-C and Supplementary Figure S2D: TNFR1-KO1 versus WT.
 #
 # The canonical source calls TNFR1-KO1 "T6". The adapter used here is generated
 # from the integer count matrix by scripts/run_bulk_rnaseq_pydeseq2.py. Positive
@@ -193,6 +193,156 @@ save_bulk_volcano_triptych(
   stem = file.path(figure_dir, "Figure_2B_triptych"),
   shared_x_label = "Log2 fold change (TNFR1-KO1 vs WT)",
   shared_y_label = "-Log10 adjusted P (capped at 300)"
+)
+
+# Figure 2C: model-based ICAM1 and IRF1 effect estimates. Each point is the
+# TNFR1-KO1-versus-WT contrast within one cytokine-treatment stratum. The
+# intervals are unadjusted 95% Wald confidence intervals; significance codes
+# use the adapter's within-contrast Benjamini-Hochberg-adjusted P values. No
+# between-treatment or between-gene comparison is performed here.
+figure_2c_conditions <- publication_condition_order
+figure_2c_genes <- c("ICAM1", "IRF1")
+figure_2c_expected_keys <- unlist(
+  lapply(
+    figure_2c_conditions,
+    function(condition) paste(condition, figure_2c_genes, sep = "\t")
+  ),
+  use.names = FALSE
+)
+figure_2c <- ko1_vs_wt[
+  ko1_vs_wt$condition %in% figure_2c_conditions &
+    ko1_vs_wt$gene_symbol_key %in% figure_2c_genes,
+  ,
+  drop = FALSE
+]
+figure_2c_observed_keys <- paste(
+  figure_2c$condition, figure_2c$gene_symbol_key, sep = "\t"
+)
+if (!setequal(figure_2c_observed_keys, figure_2c_expected_keys) ||
+    nrow(figure_2c) != length(figure_2c_expected_keys)) {
+  stop("Figure 2C requires exactly one ICAM1 and one IRF1 row in each treated stratum.")
+}
+figure_2c <- figure_2c[
+  match(figure_2c_expected_keys, figure_2c_observed_keys),
+  ,
+  drop = FALSE
+]
+figure_2c_numeric_columns <- c(
+  "base_mean", "effect", "lfc_se", "wald_statistic",
+  "p_value", "adjusted_p_value"
+)
+if (any(!is.finite(as.matrix(figure_2c[figure_2c_numeric_columns])))) {
+  stop("Figure 2C requires complete finite estimates, standard errors and P values.")
+}
+
+wald_95_z <- stats::qnorm(0.975)
+figure_2c$wald_ci_95_lower <- figure_2c$effect - wald_95_z * figure_2c$lfc_se
+figure_2c$wald_ci_95_upper <- figure_2c$effect + wald_95_z * figure_2c$lfc_se
+figure_2c$significance_code <- vapply(
+  figure_2c$adjusted_p_value,
+  function(value) {
+    if (value < 0.0001) "****" else if (value < 0.001) "***" else if (
+      value < 0.01
+    ) "**" else if (value < 0.05) "*" else "ns"
+  },
+  character(1)
+)
+
+figure_2c_export <- data.frame(
+  condition = figure_2c$condition,
+  condition_display = unname(condition_display[figure_2c$condition]),
+  gene_symbol = figure_2c$gene_symbol,
+  contrast = "TNFR1-KO1 vs WT within treatment",
+  base_mean = figure_2c$base_mean,
+  log2_fold_change_ko1_vs_wt = figure_2c$effect,
+  lfc_se = figure_2c$lfc_se,
+  wald_ci_95_lower = figure_2c$wald_ci_95_lower,
+  wald_ci_95_upper = figure_2c$wald_ci_95_upper,
+  wald_statistic_ko1_vs_wt = figure_2c$wald_statistic,
+  p_value = figure_2c$p_value,
+  adjusted_p_value_bh = figure_2c$adjusted_p_value,
+  significance_code = figure_2c$significance_code,
+  stringsAsFactors = FALSE
+)
+figure_2c_double_columns <- names(figure_2c_export)[
+  vapply(figure_2c_export, is.double, logical(1))
+]
+for (column in figure_2c_double_columns) {
+  figure_2c_export[[column]] <- sprintf("%.17g", figure_2c_export[[column]])
+}
+utils::write.table(
+  figure_2c_export,
+  file = file.path(result_dir, "Figure_2C_ICAM1_IRF1_effects.tsv"),
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE,
+  col.names = TRUE,
+  na = "NA"
+)
+
+figure_2c_plot_data <- figure_2c
+figure_2c_plot_data$condition_display <- factor(
+  unname(condition_display[figure_2c_plot_data$condition]),
+  levels = rev(unname(condition_display[figure_2c_conditions]))
+)
+figure_2c_plot_data$gene_symbol <- factor(
+  figure_2c_plot_data$gene_symbol_key,
+  levels = figure_2c_genes
+)
+label_offset <- max(
+  0.04,
+  0.02 * diff(range(
+    c(figure_2c_plot_data$wald_ci_95_lower, figure_2c_plot_data$wald_ci_95_upper)
+  ))
+)
+figure_2c_plot_data$label_x <- figure_2c_plot_data$wald_ci_95_upper + label_offset
+figure_2c_colors <- setNames(
+  c("#FBA27D", "#1CC5FE", "#6FC7CF"),
+  unname(condition_display[figure_2c_conditions])
+)
+
+figure_2c_plot <- ggplot2::ggplot(
+  figure_2c_plot_data,
+  ggplot2::aes(y = condition_display, x = effect, color = condition_display)
+) +
+  ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey35") +
+  ggplot2::geom_segment(
+    ggplot2::aes(
+      x = wald_ci_95_lower,
+      xend = wald_ci_95_upper,
+      yend = condition_display
+    ),
+    linewidth = 0.8
+  ) +
+  ggplot2::geom_point(size = 3.2) +
+  ggplot2::geom_text(
+    ggplot2::aes(x = label_x, label = significance_code),
+    color = "black",
+    size = 3.6,
+    fontface = "bold",
+    hjust = 0,
+    show.legend = FALSE
+  ) +
+  ggplot2::facet_wrap(~gene_symbol, nrow = 1) +
+  ggplot2::scale_color_manual(values = figure_2c_colors, guide = "none") +
+  ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0.06, 0.18))) +
+  ggplot2::labs(
+    x = "Log2 fold change (TNFR1-KO1 vs WT) with 95% Wald CI",
+    y = NULL
+  ) +
+  ggplot2::theme_classic(base_size = 13) +
+  ggplot2::theme(
+    strip.background = ggplot2::element_blank(),
+    strip.text = ggplot2::element_text(face = "italic", size = 14),
+    axis.text = ggplot2::element_text(color = "black"),
+    panel.spacing = grid::unit(1.0, "lines")
+  )
+
+save_figure_pair(
+  figure_2c_plot,
+  file.path(figure_dir, "Figure_2C_ICAM1_IRF1_effects"),
+  width = 7.5,
+  height = 3.8
 )
 
 # Supplementary Figure S2D is restricted to the three cytokine-treated strata.

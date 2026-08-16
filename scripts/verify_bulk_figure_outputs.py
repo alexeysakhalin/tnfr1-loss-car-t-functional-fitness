@@ -19,6 +19,28 @@ EXPECTED_PNG_PIXELS_PER_METRE = round(EXPECTED_DPI / 0.0254)
 PUBLICATION_CONDITION_ORDER = ("TNF_IFNG", "IFNG", "TNF")
 P_VALUE_FLOOR = 1e-300
 DISPLAYED_Y_CAP = 300.0
+WALD_95_Z = 1.959963984540054
+FIGURE_2C_GENES = ("ICAM1", "IRF1")
+FIGURE_2C_CONDITION_DISPLAY = {
+    "TNF_IFNG": "TNF + IFNγ",
+    "IFNG": "IFNγ",
+    "TNF": "TNF",
+}
+FIGURE_2C_TSV_COLUMNS = (
+    "condition",
+    "condition_display",
+    "gene_symbol",
+    "contrast",
+    "base_mean",
+    "log2_fold_change_ko1_vs_wt",
+    "lfc_se",
+    "wald_ci_95_lower",
+    "wald_ci_95_upper",
+    "wald_statistic_ko1_vs_wt",
+    "p_value",
+    "adjusted_p_value_bh",
+    "significance_code",
+)
 
 
 @dataclass(frozen=True)
@@ -92,6 +114,111 @@ def parse_finite(value: str) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def figure_2c_significance_code(adjusted_p: float) -> str:
+    if adjusted_p < 0.0001:
+        return "****"
+    if adjusted_p < 0.001:
+        return "***"
+    if adjusted_p < 0.01:
+        return "**"
+    if adjusted_p < 0.05:
+        return "*"
+    return "ns"
+
+
+def expected_figure_2c_rows(root: Path) -> list[dict[str, object]]:
+    adapter = (
+        root
+        / "data"
+        / "experimental"
+        / "bulk_rnaseq"
+        / "derived"
+        / "figure_2b_s2d_tnfr1_ko1_vs_wt_matched_treatments.unfiltered.tsv.gz"
+    )
+    selected: dict[tuple[str, str], dict[str, object]] = {}
+    with gzip.open(adapter, "rt", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        required = {
+            "condition",
+            "gene_symbol",
+            "base_mean",
+            "log2_fold_change_ko1_vs_wt",
+            "lfc_se",
+            "wald_statistic_ko1_vs_wt",
+            "p_value",
+            "adjusted_p_value",
+        }
+        if reader.fieldnames is None or not required.issubset(reader.fieldnames):
+            raise ValueError(f"{adapter}: missing Figure 2C columns")
+        for source in reader:
+            condition = source["condition"]
+            gene = source["gene_symbol"].strip().upper()
+            if (
+                condition not in PUBLICATION_CONDITION_ORDER
+                or gene not in FIGURE_2C_GENES
+            ):
+                continue
+            key = (condition, gene)
+            if key in selected:
+                raise ValueError(f"{adapter}: duplicate Figure 2C row {key}")
+            numeric = {
+                field: parse_finite(source[field])
+                for field in required
+                if field not in {"condition", "gene_symbol"}
+            }
+            if any(value is None for value in numeric.values()):
+                raise ValueError(f"{adapter}: incomplete Figure 2C row {key}")
+            selected[key] = numeric
+
+    expected_keys = [
+        (condition, gene)
+        for condition in PUBLICATION_CONDITION_ORDER
+        for gene in FIGURE_2C_GENES
+    ]
+    if set(selected) != set(expected_keys):
+        raise ValueError(f"{adapter}: expected exactly six Figure 2C rows")
+
+    rows: list[dict[str, object]] = []
+    for condition, gene in expected_keys:
+        source = selected[(condition, gene)]
+        effect = float(source["log2_fold_change_ko1_vs_wt"])
+        standard_error = float(source["lfc_se"])
+        wald_statistic = float(source["wald_statistic_ko1_vs_wt"])
+        adjusted_p = float(source["adjusted_p_value"])
+        if standard_error <= 0 or not math.isclose(
+            effect / standard_error,
+            wald_statistic,
+            rel_tol=1e-6,
+            abs_tol=1e-8,
+        ):
+            raise ValueError(
+                f"{adapter}: inconsistent Figure 2C Wald triplet for "
+                f"{condition}/{gene}"
+            )
+        if not 0 <= adjusted_p <= 1:
+            raise ValueError(
+                f"{adapter}: invalid adjusted P value for {condition}/{gene}"
+            )
+        rows.append(
+            {
+                "condition": condition,
+                "condition_display": FIGURE_2C_CONDITION_DISPLAY[condition],
+                "gene_symbol": gene,
+                "contrast": "TNFR1-KO1 vs WT within treatment",
+                "base_mean": float(source["base_mean"]),
+                "log2_fold_change_ko1_vs_wt": effect,
+                "lfc_se": standard_error,
+                "wald_ci_95_lower": effect - WALD_95_Z * standard_error,
+                "wald_ci_95_upper": effect + WALD_95_Z * standard_error,
+                "wald_statistic_ko1_vs_wt": wald_statistic,
+                "p_value": float(source["p_value"]),
+                "adjusted_p_value_bh": adjusted_p,
+                "significance_code": figure_2c_significance_code(adjusted_p),
+            }
+        )
+    return rows
 
 
 def expected_contract_rows(spec: FigureSpec) -> list[dict[str, object]]:
@@ -374,6 +501,55 @@ def verify_figure(spec: FigureSpec) -> None:
         verify_image_pair(spec.figure_dir / stem, (4800, 3600))
 
 
+def verify_figure_2c(root: Path) -> None:
+    table_path = (
+        root / "results" / "figure_2" / "Figure_2C_ICAM1_IRF1_effects.tsv"
+    )
+    with table_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        if tuple(reader.fieldnames or ()) != FIGURE_2C_TSV_COLUMNS:
+            raise ValueError(f"{table_path}: unexpected columns")
+        observed = list(reader)
+    expected = expected_figure_2c_rows(root)
+    if len(observed) != len(expected):
+        raise ValueError(
+            f"{table_path}: observed {len(observed)} rows, expected {len(expected)}"
+        )
+
+    text_fields = (
+        "condition",
+        "condition_display",
+        "gene_symbol",
+        "contrast",
+        "significance_code",
+    )
+    numeric_fields = tuple(
+        field for field in FIGURE_2C_TSV_COLUMNS if field not in text_fields
+    )
+    for index, (actual, wanted) in enumerate(zip(observed, expected), start=1):
+        context = f"{table_path}, row {index}"
+        for field in text_fields:
+            if actual[field] != wanted[field]:
+                raise ValueError(
+                    f"{context}, {field}: observed {actual[field]!r}, "
+                    f"expected {wanted[field]!r}"
+                )
+        for field in numeric_fields:
+            assert_close(
+                actual[field],
+                float(wanted[field]),
+                f"{context}, {field}",
+                abs_tol=0.0
+                if field in {"p_value", "adjusted_p_value_bh"}
+                else 1e-12,
+            )
+
+    verify_image_pair(
+        root / "figures" / "figure_2" / "Figure_2C_ICAM1_IRF1_effects",
+        (4500, 2280),
+    )
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -393,6 +569,8 @@ def main(argv: Iterable[str] | None = None) -> int:
             f"{spec.name}: passed; common x range {common_x}; "
             f"points at y=300 by panel {capped}"
         )
+    verify_figure_2c(root)
+    print("Figure 2C: passed; six PyDESeq2 effects with 95% Wald CIs")
     return 0
 
 
