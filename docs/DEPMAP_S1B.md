@@ -7,29 +7,15 @@ and applies the population rule defined below.
 
 ## Publication status
 
-The numerical contract is complete and the expression matrix is fixed as
-DepMap Public 25Q2. The release identity of the separately checksum-pinned
-`Model.csv` must still be confirmed from the authors' original DepMap download
-record before a same-release claim is made. Its checksum is independently
-reproduced by a frozen copy labelled DepMap Public 25Q3, but an official
-historical DepMap inventory exposing the 25Q2 `Model.csv` checksum was not
-available for verification. This does not prove that the 25Q2 and 25Q3
-metadata files differ; it means only that the supplied metadata release is
-currently unverified.
+The numerical contract is complete. The authors confirmed that the expression
+archive and `Model.csv` were downloaded from the DepMap Portal **All Data**
+page for DepMap Public 25Q2. Their exact filenames, sizes and checksums are
+locked below, and the provenance therefore records a confirmed same-release
+25Q2 pair.
 
-There are two publication-safe resolutions:
-
-1. Obtain `Model.csv` from the same verified DepMap release as the expression
-   matrix, rerun the checksum/count contract, and update the fixed values if
-   that file differs.
-2. Use the currently supplied pair and identify the expression and metadata
-   releases separately in Methods, the figure legend and provenance. A
-   cross-release metadata join is acceptable as a descriptive annotation step
-   only when it is disclosed explicitly.
-
-Do not silently label both files as DepMap Public 25Q2. DepMap Public 25Q2 was
-distributed through the DepMap portal without a release-specific Figshare DOI;
-a DOI must not be invented.
+DepMap Public 25Q2 was distributed through the DepMap portal and does not have
+a release-specific Figshare DOI. Cite the release and portal directly; do not
+invent a DOI.
 
 ## Checksum-pinned inputs
 
@@ -48,16 +34,15 @@ creates four deterministic, version-controlled artifacts:
 |---|---|---|
 | `data/analysis/depmap_s1b_eligible_models.tsv.gz` | 1,591 eligible rows, expression values, threshold flags and quadrant | `368ad92b085a722d3984a5355bea3109d8e5a2b29ffe563c3fd284cf8970f354` |
 | `data/analysis/depmap_s1b_preparation_qc.json` | Source, join and denominator QC | `8d58a7113ca08c7ffd8297e26f3a3a29693e61e119186365c1fb04531d988b79` |
-| `data/analysis/depmap_s1b_source_provenance.json` | Source digests, population rule and release-status lock | `e21b63f90835e80e71c388b13e167b214773cd6a988aa43a3aaac8cd65745242` |
+| `data/analysis/depmap_s1b_source_provenance.json` | Source digests, population rule and confirmed release-pair lock | `95f8c8f11fbb43b1bf093811d110bdd1c5b5d53ef7771c797c165b1061e14816` |
 | `reference_results/depmap_s1b_statistics.csv` | Six fixed counts and percentages | `60585de1dd22e879220d7d9da89d6cd762685b1b11af1d60b64627490e80e990` |
 
 The compressed TSV is sorted by `ModelID` and written with gzip modification
 time zero and no original filename. Repeated preparation from unchanged source
 files therefore produces identical bytes. The source-provenance artifact fixes
-the expression release as 25Q2, the metadata release identity as unverified,
-`release_pair_status` as `unverified`, and `same_release_pair` as null. Release
-labels are not accepted as render-time input; changing this state requires an
-intentional, reviewed repository update after source confirmation.
+both inputs as DepMap Public 25Q2, `release_pair_status` as `confirmed`, and
+`same_release_pair` as true. Release labels are not accepted as render-time
+input; changing this state requires an intentional, reviewed repository update.
 
 ## Population rule and audit counts
 
@@ -132,19 +117,16 @@ The preparation script validates both raw-file sizes and digests, the sole ZIP
 member and its digest, all source schemas and counts, one-default-profile-per-
 model selection, metadata coverage, population filters and threshold results.
 It then rewrites the TSV, QC, source-provenance and statistics artifacts
-deterministically. Release labels are not accepted as command-line overrides:
-until confirmed, they cannot be injected into the locked provenance by a
-rendering command.
+deterministically. Release labels are not accepted as command-line overrides
+and cannot be injected into the locked provenance by a rendering command.
 
 ## Manuscript wording
 
-Methods should state the release of each input separately unless same-release
-provenance is verified. A concise template is:
+Methods may use the following concise template:
 
 > We selected records with `is_default_entry=True` from the checksum-pinned
 > DepMap Public 25Q2 profile-level log2(TPM+1) matrix and joined them by
-> `ModelID` to a separately checksum-pinned `Model.csv` [insert its verified
-> release, or state that the metadata release could not be verified]. We retained
+> `ModelID` to the same-release checksum-pinned `Model.csv`. We retained
 > records annotated as `ModelType="Cell Line"` with a non-missing
 > `OncotreePrimaryDisease` other than `Non-Cancerous`. `TissueOrigin` was empty
 > in the supplied metadata and was not used. RIPK3 and NLRP3 were classified as
@@ -163,9 +145,9 @@ mechanistic or clinical validation.
 
 ## Citation
 
-Cite each verified DepMap release in the form requested by the portal, for
-example `DepMap, Broad (2025). DepMap Public 25Q3. Dataset. depmap.org`, and
-cite the portal at <https://depmap.org/portal/>. Also cite:
+Cite the release as `DepMap, Broad (2025). DepMap Public 25Q2. Dataset.
+depmap.org`, and cite the portal at <https://depmap.org/portal/>. No
+release-specific Figshare DOI is available for 25Q2. Also cite:
 
 Arafeh R, Shibue T, Dempster JM, et al. The present and future of the Cancer
 Dependency Map. *Nature Reviews Cancer*. 2025;25:59-73.

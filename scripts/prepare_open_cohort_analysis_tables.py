@@ -11,12 +11,14 @@ import argparse
 import csv
 import gzip
 import hashlib
+import importlib.util
 import io
 import json
 import math
 import os
 import re
 import sys
+from decimal import Decimal, DecimalException, ROUND_HALF_UP, localcontext
 from datetime import date, datetime, time
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -33,6 +35,13 @@ DEFAULT_RAW = ROOT / "data" / "raw"
 DEFAULT_OUTPUT = ROOT / "data" / "analysis"
 DEFAULT_MANIFEST = ROOT / "data" / "source_manifest.tsv"
 DEFAULT_RESOURCES = ROOT / "resources"
+IMVIGOR_EXPRESSION_CONTRACT = (
+    DEFAULT_RESOURCES / "IMvigor210_expression_semantic_contract_v1.json"
+)
+IMVIGOR_EXPRESSION_VERIFIER = ROOT / "scripts" / "verify_imvigor210_expression.py"
+IMVIGOR_EXPRESSION_SCALE = 6
+IMVIGOR_EXPRESSION_QUANTUM = Decimal("0.000001")
+IMVIGOR_EXPRESSION_MULTIPLIER = Decimal(10) ** IMVIGOR_EXPRESSION_SCALE
 BUFFER_SIZE = 1024 * 1024
 
 EXPRESSION_COLUMNS = [
@@ -164,6 +173,81 @@ def first_verified_input(
     raise FileNotFoundError(
         "None of the accepted source files is present: " + ", ".join(expected)
     )
+
+
+def semantically_verified_imvigor_expression(
+    raw_dir: Path, manifest: dict[str, dict[str, str]]
+) -> Path:
+    """Verify expression meaning without requiring one CSV byte rendering."""
+
+    source_id = "imvigor210_expression_export"
+    if source_id not in manifest:
+        raise KeyError(f"Source absent from manifest: {source_id}")
+    path = raw_dir / manifest[source_id]["expected_filename"]
+    if not path.is_file():
+        raise FileNotFoundError(f"Missing {source_id}: {path}")
+    specification = importlib.util.spec_from_file_location(
+        "verify_imvigor210_expression_for_preparation",
+        IMVIGOR_EXPRESSION_VERIFIER,
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError("Could not load the IMvigor210 semantic verifier")
+    verifier = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(verifier)
+    try:
+        contract = verifier.load_contract(IMVIGOR_EXPRESSION_CONTRACT)
+        assert_imvigor_analysis_contract(contract)
+        verifier.verify_expression(path, IMVIGOR_EXPRESSION_CONTRACT)
+    except verifier.VerificationError as exc:
+        raise RuntimeError(str(exc)) from exc
+    return path
+
+
+def assert_imvigor_analysis_contract(contract: dict[str, object]) -> None:
+    """Prevent verifier and downstream canonicalization policy from drifting."""
+
+    semantics = contract.get("semantic_digests")
+    analysis = contract.get("analysis_canonicalization")
+    if not isinstance(semantics, dict) or not isinstance(analysis, dict):
+        raise RuntimeError("IMvigor210 analysis canonicalization contract is missing")
+    if (
+        semantics.get("required_scale") != IMVIGOR_EXPRESSION_SCALE
+        or analysis.get("scale") != IMVIGOR_EXPRESSION_SCALE
+        or analysis.get("rounding") != "ROUND_HALF_UP"
+        or analysis.get("required") is not True
+    ):
+        raise RuntimeError(
+            "IMvigor210 verifier and analysis canonicalization policies differ"
+        )
+
+
+def canonical_imvigor_fixed6(value: object) -> float:
+    """Map any accepted expression token to its fixed6 analysis value."""
+
+    text = clean(value)
+    if not text:
+        raise ValueError("Invalid IMvigor210 expression numeric field")
+    try:
+        number = Decimal(text)
+    except (DecimalException, ValueError) as exc:
+        raise ValueError("Invalid IMvigor210 expression numeric field") from exc
+    if not number.is_finite() or number < 0:
+        raise ValueError("Invalid IMvigor210 expression numeric field")
+    try:
+        with localcontext() as context:
+            context.prec = 50
+            scaled = int(
+                number.quantize(
+                    IMVIGOR_EXPRESSION_QUANTUM,
+                    rounding=ROUND_HALF_UP,
+                )
+                * IMVIGOR_EXPRESSION_MULTIPLIER
+            )
+    except (DecimalException, OverflowError, ValueError) as exc:
+        raise ValueError(
+            "IMvigor210 expression numeric field is outside the supported range"
+        ) from exc
+    return (0 if scaled == 0 else scaled) / 1_000_000.0
 
 
 def clean(value: object) -> str:
@@ -456,7 +540,7 @@ def prepare_imvigor(
     import numpy as np
 
     clinical_path = verified_input(raw_dir, manifest, "imvigor210_clinical_export")
-    expression_path = verified_input(raw_dir, manifest, "imvigor210_expression_export")
+    expression_path = semantically_verified_imvigor_expression(raw_dir, manifest)
 
     with clinical_path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.reader(handle)
@@ -481,7 +565,12 @@ def prepare_imvigor(
             if not row:
                 continue
             source_gene_symbols.append(full_entrez_to_symbol.get(clean(row[0]), ""))
-            all_vectors.append([as_float(value) for value in row[1:]])
+            # Fixed6 is both the compatibility gate and the analysis domain.
+            # Canonicalizing before mapping and within-sample ranking ensures
+            # every accepted CSV produces identical downstream results.
+            all_vectors.append(
+                [canonical_imvigor_fixed6(value) for value in row[1:]]
+            )
     raw_matrix = np.asarray(all_vectors, dtype=float)
     mapped_genes, matrix, feature_counts = aggregate_transcriptome(
         raw_matrix, source_gene_symbols
@@ -522,6 +611,11 @@ def prepare_imvigor(
         "cohort_id": "IMvigor210_BLCA",
         "samples": len(sample_ids),
         "source_features_total": int(raw_matrix.shape[0]),
+        "expression_semantic_scale": IMVIGOR_EXPRESSION_SCALE,
+        "expression_semantic_rounding": "ROUND_HALF_UP",
+        "expression_semantic_contract_sha256": sha256(
+            IMVIGOR_EXPRESSION_CONTRACT
+        ),
         "mapped_unique_genes_ranked": int(matrix.shape[0]),
         "unmapped_source_features": sum(not symbol for symbol in source_gene_symbols),
         "duplicate_source_features_aggregated": sum(count - 1 for count in feature_counts.values()),

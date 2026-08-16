@@ -17,12 +17,15 @@ by `data/experimental/experimental_data_manifest.tsv`,
 | Targeted single-cell panels | `data/experimental/singlecell/WT_targeted_counts.tsv.gz`; `KO1_targeted_counts.tsv.gz`; `KO2_targeted_counts.tsv.gz`; `TCR_targeted_counts.tsv.gz` |
 | DepMap S1B direct render | `data/analysis/depmap_s1b_eligible_models.tsv.gz`; preparation QC; source provenance; `reference_results/depmap_s1b_statistics.csv` |
 | CheckMate Figure 5F/S6G | `data/analysis/checkmate_c6_global_gene_models.tsv.gz`; `data/analysis/checkmate_c6_group_balance.tsv` |
-| Fixed analysis resources | `resources/CAR_T_state_signatures.csv`; `resources/Figure_5F_curated_gene_sets.csv`; identifier maps |
+| Fixed analysis resources | `resources/CAR_T_state_signatures.csv`; `resources/CAR_T_state_signature_concordance_v1.csv`; `resources/Figure_5F_curated_gene_sets.csv`; identifier maps |
 
 ## Project source workbooks kept outside GitHub
 
-Place these files together in one local directory only when rebuilding the
-canonical experimental tables. Filenames must match exactly.
+Extract the Zenodo source-workbook archive and pass its root directory to the
+preparation script. The script accepts either a flat directory or the deposited
+`bulk_rnaseq/` and `targeted_single_cell/` subdirectories, searches recursively,
+and requires exactly one match for every filename pattern. Filenames must match
+exactly.
 
 | Required filename | Source content | Used by |
 |---|---|---|
@@ -44,28 +47,76 @@ Rebuild canonical experimental tables with:
 ```bash
 python scripts/prepare_experimental_analysis_tables.py --input-dir /path/to/workbooks
 python scripts/prepare_bulk_rnaseq_counts.py \
-  --input /path/to/workbooks/Expression_Profile.GRCh38.gene.xlsx \
+  --input /path/to/workbooks/bulk_rnaseq/Expression_Profile.GRCh38.gene.xlsx \
   --output-dir data/experimental/bulk_rnaseq
 ```
+
+For a flat local directory, omit `bulk_rnaseq/` from the second command.
 
 ## Public-cohort inputs kept outside GitHub
 
 Place verified publisher files under `data/raw/` using the exact filenames
 below. `scripts/fetch_public_sources.py --list` reports source URLs, licences,
-expected sizes and SHA-256 values.
+canonical sizes and SHA-256 values. These are exact gates except where the
+IMvigor210 expression row explicitly identifies its byte hash as provenance
+and points to the required semantic contract.
 
 | Required filename | Source |
 |---|---|
 | `41591_2020_839_MOESM2_ESM.xlsx` | Braun et al. CheckMate ccRCC supplement; automatic checksum-verified download supported |
 | `41588_2023_1355_MOESM3_ESM.xlsx` | Ravi et al. SU2C-MARK supplement |
 | `41591_2019_654_MOESM4_ESM.xlsx` | Liu et al. clinical supplement |
-| `41591_2019_654_MOESM3_ESM.txt` | Liu et al. expression supplement |
-| `IMvigor210_clinical.csv` | checksum-pinned clinical export from `IMvigor210CoreBiologies` 1.0.0 |
-| `IMvigor210_expression_log2CPM.csv` | checksum-pinned log2-CPM export from the same package |
+| one of `41591_2019_654_MOESM3_ESM.txt` or `Liu2019_NatureMedicine_metastatic_melanoma_antiPD1_expression_matrix.csv` | Liu et al. expression supplement, either as the official text file or the checksum-pinned CSV export accepted by the preparer |
+| `IMvigor210CoreBiologies_1.0.0.tar.gz` | official CC BY 3.0 processed package; supplied to `scripts/export_imvigor210_inputs.R`, not to the cohort-preparation script |
+| `IMvigor210_clinical.csv` | exact-checksum clinical export generated locally by `scripts/export_imvigor210_inputs.R` |
+| `IMvigor210_expression_log2CPM.csv` | semantically pinned `log2(CPM + 1)` export generated locally by the same script; fixed6 contract is required, canonical byte hash is provenance only |
 
 These files contain publisher or sample-level data and are not redistributed
 through the repository. The preparation script writes local-only harmonized
 tables under `data/analysis/` and `data/processed/`.
+
+Download the official IMvigor210 package archive from the source URL in
+`data/source_manifest.tsv`, retain its canonical filename, and run:
+
+```bash
+python scripts/fetch_public_sources.py \
+  --source imvigor210_processed_package \
+  --accept-licensed-public-downloads
+Rscript scripts/export_imvigor210_inputs.R \
+  --package-tarball data/raw/IMvigor210CoreBiologies_1.0.0.tar.gz \
+  --output-dir data/raw
+python scripts/verify_imvigor210_expression.py \
+  --input data/raw/IMvigor210_expression_log2CPM.csv
+Rscript scripts/export_imvigor210_inputs.R \
+  --verify-only --output-dir data/raw
+```
+
+The downloader verifies the package archive against the manifest. The exporter
+verifies it again before reading it. It retains exact byte gates for that archive
+and the clinical CSV. For expression it checks all cells against the independent
+direct CPM formula, repeats the all-cell check after CSV write/readback, and
+requires the fixed6 semantic digest defined in
+`resources/IMvigor210_expression_semantic_contract_v1.json`. Fixed7/fixed8 and
+the canonical file SHA-256 are provenance diagnostics only. The streaming
+Python verifier retains no expression matrix and its report contains dimensions
+and hashes, never sample/feature identifiers or expression values. The cohort
+preparer then canonicalizes every accepted cell to fixed6 `ROUND_HALF_UP`
+before mapping and ranking; fixed6-compatible CSV variants consequently produce
+the same analysis matrix rather than merely passing the same input check.
+The historical-input impact audit is committed as
+`resources/IMvigor210_fixed6_canonicalization_impact_v1.json`: all 61,944
+selected-expression keys and every rank percentile were unchanged; 59,954
+printed expression values changed by at most `4.999993601373376e-7`. Figure 5C
+scores, S6 score orderings, Spearman results and significance/selection
+thresholds were unchanged. Density-rendering bytes may change on regeneration,
+but no reported interpretation changes.
+
+Loading the legacy `CountDataSet` requires the pinned R 4.0 / Bioconductor 3.11
+environment with `DESeq`, `Biobase` and `edgeR`; current analyses use R 4.4.3.
+The final R command checks already generated files without loading the package
+and invokes the semantic verifier. The package archive and both CSV files remain
+local-only and are not included in the GitHub release or DOI-backed archive,
+including Zenodo.
 
 ## DepMap source files kept outside GitHub
 
@@ -75,7 +126,7 @@ tracked compact derivative:
 | Required filename | Source identity |
 |---|---|
 | `OmicsExpressionTPMLogp1HumanProteinCodingGenes.zip` | DepMap Public 25Q2 expression archive |
-| `Model.csv` | checksum-pinned supplied DepMap model metadata; exact quarterly release unverified |
+| `Model.csv` | checksum-pinned DepMap Public 25Q2 model metadata downloaded from the same **All Data** release page as the expression archive |
 
 Run:
 

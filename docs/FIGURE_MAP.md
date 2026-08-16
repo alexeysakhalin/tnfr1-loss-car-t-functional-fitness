@@ -11,21 +11,37 @@ ICAM1/conjugate experiment is Supplementary Figure S3.
 | Figure 1B | `scripts/run_bulk_rnaseq_pydeseq2.py`; `R/03_figure_1_B_C.R` | `data/experimental/bulk_rnaseq/`; complete WT cytokine adapters | `figures/figure_1/Figure_1B_triptych.{png,tiff}` |
 | Figure 1C | same workflow | complete WT cytokine adapters | `figures/figure_1/Figure_1C_upregulated_overlap.{png,tiff}` |
 | Figure 2B | `scripts/run_bulk_rnaseq_pydeseq2.py`; `R/04_figure_2_B_suppl_S2D.R` | complete within-treatment TNFR1-KO1-versus-WT adapters | `figures/figure_2/Figure_2B_triptych.{png,tiff}` |
+| Figure 2C | same workflow | ICAM1 and IRF1 rows from the complete within-treatment adapter | `figures/figure_2/Figure_2C_ICAM1_IRF1_effects.{png,tiff}`; exact estimates in `results/figure_2/Figure_2C_ICAM1_IRF1_effects.tsv` |
 | Supplementary Figure S2D | same workflow | combined four-stratum adapter; Venn uses TNF, IFN-gamma and TNF+IFN-gamma | `figures/figure_2/Supplementary_Figure_S2D_downregulated_overlap.{png,tiff}` |
-| Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R` | `WT_targeted_counts.tsv.gz`, `KO1_targeted_counts.tsv.gz`, `KO2_targeted_counts.tsv.gz` | `figures/Figure_4A_UMAP_clusters_annotated.png`; `figures/Figure_4B_cluster_fraction_facet.png` |
-| Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | same WT/KO matrices | `figures/Supplementary_Figure_S5A_UMAP_by_sample.png` |
+| Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R` | `WT_targeted_counts.tsv.gz`, `KO1_targeted_counts.tsv.gz`, `KO2_targeted_counts.tsv.gz`; `resources/CAR_T_state_signature_concordance_v1.csv` | `figures/Figure_4A_UMAP_clusters_annotated.png`; `figures/Figure_4B_cluster_fraction_facet.png`; descriptive denominator is all QC-passing C0-C10 cells |
+| Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | same WT/KO matrices | `figures/Figure_4A_UMAP_4panel.{png,tiff}` |
 | Figure 5A | `R/05_figure_4_AB_suppl_S5A.R` | `TCR_targeted_counts.tsv.gz`, 5,662 CD3-positive cells | `figures/Figure_5A_TCR_UMAP_clusters.png`; `figures/Figure_5A_TCR_cluster_composition.png` |
 
 The bulk panels use complete regenerated result universes. Figure 1B/1C DEG
 sets require baseMean >=30, adjusted P <0.05 and the stated fold-change
 threshold. Figure 2B uses within-treatment TNFR1-KO1-versus-WT contrasts, not
-the genotype-by-treatment interaction coefficients. Source label `T6` maps to
-manuscript clone `TNFR1-KO1`.
+the genotype-by-treatment interaction coefficients. Figure 2C shows the same
+within-treatment model estimates for ICAM1 and IRF1 with unadjusted 95% Wald
+confidence intervals and within-contrast BH-adjusted P values; it contains no
+between-treatment tests. Source label `T6` maps to manuscript clone
+`TNFR1-KO1`.
 
 For the targeted single-cell panels, archive before/after QC counts, nonempty
 marker tables and `sessionInfo()`. Manual cluster labels must be checked against
 the exported marker profiles because numerical cluster identifiers may permute
-between runs.
+between runs. The R/05 release guard requires the exact reviewed C0-C9
+current-only/frozen-only gene pattern in the versioned concordance contract;
+the guard does not use a general overlap threshold. Figure 4A-B retains C10 as
+the neutral `small cytokine/IFN-responsive cluster` in the descriptive C0-C10
+denominator. C10 is outside the historical frozen/transferred C0-C9 mapping and
+is not classified as a contaminant. Aggregate C10 marker, cluster-count and
+filtering-QC tables are retained in
+`results/targeted-singlecell-diagnostics/` even if that guard stops the run.
+Both per-cluster XLSX files must pass the structural and sheet-layout checks in
+[`XLSX_OUTPUT_CONTRACT.md`](XLSX_OUTPUT_CONTRACT.md) before artifact assembly.
+The repeated-stimulation annotation assigns C3 to the
+`CD8/TRDC-associated cytotoxic state` and C4 to `Cycling T-cell state II`;
+these labels are specific to that independently clustered dataset.
 
 ## Clinical-context panels
 
@@ -52,9 +68,10 @@ from these outputs; pooled-arm panels are not compatible with this analysis.
 | Supplementary Figure S1B | repository workflow | `R/11_supplementary_1B.R` renders the tracked 1,591-model derivative; exact contracts are in `docs/DEPMAP_S1B.md` |
 | Supplementary Figure S3 | separate flow-cytometry workflow | raw FCS files, compensation/gating workspace, live-cell denominator, E:T ratio, timing, replicate/donor map and prespecified WT-versus-KO contrasts |
 
-The DepMap expression source is DepMap Public 25Q2. The exact quarterly release
-of the supplied `Model.csv` is not assigned because it could not be verified;
-the checksum-pinned metadata identity is recorded in the provenance file.
+The DepMap expression archive and `Model.csv` are a confirmed same-release
+DepMap Public 25Q2 pair downloaded from the portal's **All Data** page. The
+checksum-pinned identities and release assertion are recorded in the
+provenance file; no release-specific Figshare DOI is assigned to 25Q2.
 
 ## Final assembly checks
 

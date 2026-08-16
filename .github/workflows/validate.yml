@@ -32,7 +32,10 @@ jobs:
       - name: Parse every R script
         shell: Rscript {0}
         run: |
-          paths <- list.files("R", pattern = "[.]R$", full.names = TRUE)
+          paths <- c(
+            list.files("R", pattern = "[.]R$", full.names = TRUE),
+            list.files("scripts", pattern = "[.]R$", full.names = TRUE)
+          )
           failures <- vapply(paths, function(path) {
             tryCatch({ parse(file = path); FALSE }, error = function(error) {
               message(path, ": ", conditionMessage(error)); TRUE

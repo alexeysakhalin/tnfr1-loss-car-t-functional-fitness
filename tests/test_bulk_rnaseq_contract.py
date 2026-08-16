@@ -265,6 +265,10 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         )
         self.assertIn("Figure_2B_triptych", figure_2)
         self.assertIn("Figure_2B_volcano_output_contract.tsv", figure_2)
+        self.assertIn("Figure_2C_ICAM1_IRF1_effects", figure_2)
+        self.assertIn("wald_ci_95_lower", figure_2)
+        self.assertIn("wald_ci_95_upper", figure_2)
+        self.assertNotIn("geom_signif", figure_2)
         self.assertIn("figure_2b_label_genes <- c(", figure_2)
         for gene in ("ICAM1", "MLKL", "GSDME", "IRF1"):
             self.assertIn(f'"{gene}"', figure_2)
@@ -303,6 +307,7 @@ class BulkRnaSeqContractTests(unittest.TestCase):
             figure_1, figure_2 = module.figure_specs(ROOT)
             figure_1_rows = module.expected_contract_rows(figure_1)
             figure_2_rows = module.expected_contract_rows(figure_2)
+            figure_2c_rows = module.expected_figure_2c_rows(ROOT)
         finally:
             if previous is None:
                 sys.modules.pop(module_name, None)
@@ -353,6 +358,33 @@ class BulkRnaSeqContractTests(unittest.TestCase):
         self.assertEqual(
             [row["plotted_label_count"] for row in figure_2_rows],
             [4, 4, 4],
+        )
+        self.assertEqual(
+            [(row["condition"], row["gene_symbol"]) for row in figure_2c_rows],
+            [
+                ("TNF_IFNG", "ICAM1"),
+                ("TNF_IFNG", "IRF1"),
+                ("IFNG", "ICAM1"),
+                ("IFNG", "IRF1"),
+                ("TNF", "ICAM1"),
+                ("TNF", "IRF1"),
+            ],
+        )
+        self.assertEqual(
+            [row["significance_code"] for row in figure_2c_rows],
+            ["****", "***", "****", "****", "****", "****"],
+        )
+        self.assertAlmostEqual(
+            figure_2c_rows[0]["log2_fold_change_ko1_vs_wt"],
+            -1.9725787735602656,
+        )
+        self.assertAlmostEqual(
+            figure_2c_rows[1]["adjusted_p_value_bh"],
+            8.785896839383e-4,
+        )
+        self.assertAlmostEqual(
+            figure_2c_rows[0]["wald_ci_95_lower"],
+            -2.01701641260892,
         )
 
     def test_analysis_input_loading_and_factor_levels(self) -> None:

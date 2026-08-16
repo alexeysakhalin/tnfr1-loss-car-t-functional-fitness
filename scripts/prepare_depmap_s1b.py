@@ -533,14 +533,15 @@ def main() -> None:
         "contract_version": 1,
         "expression_release": "DepMap Public 25Q2",
         "expression_release_identity_status": "confirmed",
-        "model_release": None,
-        "model_release_identity_status": "unverified",
-        "release_pair_status": "unverified",
-        "same_release_pair": None,
+        "model_release": "DepMap Public 25Q2",
+        "model_release_identity_status": "confirmed",
+        "release_pair_status": "confirmed",
+        "same_release_pair": True,
         "release_identity_note": (
-            "The expression matrix is DepMap Public 25Q2. Model.csv is "
-            "separately checksum-pinned, but its release identity must be "
-            "confirmed before a same-release claim is made."
+            "Both source files were downloaded by the authors from the "
+            "DepMap Portal All Data page for DepMap Public 25Q2 and are "
+            "pinned here by filename, size, and checksum. DepMap Public "
+            "25Q2 was portal-hosted and has no release-specific Figshare DOI."
         ),
         "source_files": {
             "expression_archive": archive_source,

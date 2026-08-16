@@ -1,8 +1,8 @@
 # Supplementary Figure S1B from the tracked DepMap derivative.
 #
 # scripts/prepare_depmap_s1b.py validates and reduces the large third-party
-# sources. This renderer uses only packages already locked for figure builds
-# and cannot inject a DepMap release label while source pairing is unverified.
+# sources. This renderer uses only packages already locked for figure builds;
+# the confirmed same-release provenance is fixed in the reviewed contract.
 
 suppressPackageStartupMessages({
   library(data.table)
@@ -30,7 +30,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 expected_sizes <- c(
   input = 47514,
   qc = 1583,
-  source_provenance = 1895,
+  source_provenance = 1984,
   summary = 305
 )
 tracked_files <- c(
@@ -53,11 +53,13 @@ if (!identical(as.numeric(observed_sizes), as.numeric(expected_sizes))) {
 }
 
 # This state is intentionally not configurable at render time. Source hashes,
-# release status and same-release=null are checked by the Python preparation
-# contract and repository tests. Confirmation requires a reviewed data update.
-release_pair_status <- "unverified"
+# release status and the same-release assertion are checked by the Python
+# preparation contract and repository tests.
+release_pair_status <- "confirmed"
 expression_release <- "DepMap Public 25Q2"
-model_release_identity_status <- "unverified"
+model_release <- "DepMap Public 25Q2"
+model_release_identity_status <- "confirmed"
+same_release_pair <- "TRUE"
 
 expected_columns <- c(
   "ProfileID",
@@ -254,7 +256,9 @@ runtime_provenance <- data.table(
   field = c(
     "release_pair_status",
     "expression_release",
+    "model_release",
     "model_release_identity_status",
+    "same_release_pair",
     "derived_file",
     "population",
     "n_models",
@@ -265,7 +269,9 @@ runtime_provenance <- data.table(
   value = c(
     release_pair_status,
     expression_release,
+    model_release,
     model_release_identity_status,
+    same_release_pair,
     basename(input_file),
     paste0(
       "DepMap cell-line models with a non-missing OncoTree primary-disease ",

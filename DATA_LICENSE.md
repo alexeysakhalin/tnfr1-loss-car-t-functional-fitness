@@ -18,9 +18,16 @@ in `data/source_manifest.tsv` and `data/README.md`. In particular, the Braun
 CheckMate source workbook and all sample-level derivatives are not distributed
 by this repository.
 
-The complete DepMap expression ZIP and source `Model.csv` used for
-Supplementary Figure S1B are also not distributed. They remain available from
-the DepMap portal under the source terms recorded in
+The official `IMvigor210CoreBiologies` package and the two version-locked
+patient/sample-level CSV exports generated from it also remain local-only. The
+clinical export has an exact checksum gate; the expression export has a
+non-identifying versioned semantic contract. They are recreated with
+`scripts/export_imvigor210_inputs.R` and are not included in GitHub or in the
+DOI-backed archive, including Zenodo.
+
+The complete DepMap Public 25Q2 expression ZIP and same-release source
+`Model.csv` used for Supplementary Figure S1B are also not distributed. They
+remain available from the DepMap portal under the source terms recorded in
 `data/source_manifest.tsv`. The repository distributes only the compact
 model-level S1B derivative needed to render the panel, together with source
 metadata, exact checksums, preparation code and QC. Reuse of that derivative

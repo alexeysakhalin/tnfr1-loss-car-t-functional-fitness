@@ -20,6 +20,13 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 
 
 class RepositoryContractTests(unittest.TestCase):
+    def test_experimental_preparer_accepts_nested_deposit_layout(self) -> None:
+        source = (
+            ROOT / "scripts" / "prepare_experimental_analysis_tables.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("input_dir.rglob(pattern)", source)
+        self.assertIn("nested bulk_rnaseq/ and targeted_single_cell/", source)
+
     def test_git_tracks_no_raw_or_sample_level_tables(self) -> None:
         completed = subprocess.run(
             ["git", "ls-files"], cwd=ROOT, check=True,
@@ -70,6 +77,144 @@ class RepositoryContractTests(unittest.TestCase):
                 {"local_only", "metadata_only", "mapping_resource_committed"},
             )
 
+    def test_imvigor_exports_are_reproducible_local_inputs(self) -> None:
+        manifest_path = ROOT / "data" / "source_manifest.tsv"
+        with manifest_path.open("r", encoding="utf-8", newline="") as handle:
+            manifest = {
+                row["source_id"]: row
+                for row in csv.DictReader(handle, delimiter="\t")
+            }
+
+        package = manifest["imvigor210_processed_package"]
+        clinical = manifest["imvigor210_clinical_export"]
+        expression = manifest["imvigor210_expression_export"]
+        self.assertEqual(package["expected_filename"], (
+            "IMvigor210CoreBiologies_1.0.0.tar.gz"
+        ))
+        self.assertEqual(package["size_bytes"], "122127298")
+        self.assertEqual(package["sha256"], (
+            "cfdd3176d7b34de5b04fb9416bfd2b20fa4b6e238aaad5f20b048a34329ea178"
+        ))
+        self.assertEqual(clinical["fetch_mode"], "local_input")
+        self.assertEqual(expression["fetch_mode"], "local_input")
+        self.assertEqual(clinical["repository_policy"], "local_only")
+        self.assertEqual(expression["repository_policy"], "local_only")
+        self.assertEqual(clinical["source_url"], "")
+        self.assertEqual(expression["source_url"], "")
+        for row in (package, clinical, expression):
+            self.assertIn("scripts/export_imvigor210_inputs.R", row["notes"])
+
+        exporter_path = ROOT / "scripts" / "export_imvigor210_inputs.R"
+        exporter = exporter_path.read_text(encoding="utf-8")
+        self.assertTrue(exporter.startswith("#!/usr/bin/env Rscript\n"))
+        self.assertIn("DESeq::counts(cds)", exporter)
+        self.assertIn("Biobase::pData(cds)", exporter)
+        self.assertIn(
+            "expression_log2cpm <- log2(edgeR::cpm(count_matrix, log = FALSE) + 1)",
+            exporter,
+        )
+        self.assertIn("utils::write.csv(", exporter)
+        self.assertIn('options(scipen = 0, OutDec = ".")', exporter)
+        self.assertIn('file(path, open = "wb")', exporter)
+        self.assertIn("--package-tarball", exporter)
+        self.assertIn("--verify-only", exporter)
+        self.assertIn("--diagnostics-path", exporter)
+        self.assertIn("--semantic-report-path", exporter)
+        self.assertIn("--external-semantic-file-verification", exporter)
+        self.assertIn(clinical["sha256"], exporter)
+        self.assertIn(expression["sha256"], exporter)
+        self.assertIn(package["sha256"], exporter)
+        self.assertIn(
+            'sweep(count_matrix, 2L, library_sizes, "/") * 1e6 + 1',
+            exporter,
+        )
+        self.assertIn("ALL_CELL_ABSOLUTE_TOLERANCE <- 5e-13", exporter)
+        self.assertIn("ALL_CELL_RELATIVE_TOLERANCE <- 5e-14", exporter)
+        self.assertIn("compare_expression_matrices", exporter)
+        self.assertIn("read_expression_csv", exporter)
+        self.assertIn("verify_expression_file_semantically", exporter)
+        self.assertIn("IMvigor210_expression_semantic_contract_v1.json", exporter)
+        self.assertNotIn("EXPECTED_EXPRESSION_SEMANTICS", exporter)
+        self.assertNotIn("expression_values_8dp_sha256", exporter)
+        self.assertNotIn(
+            'verify_file(\n  staged_paths[["expression"]], EXPECTED_EXPORTS$expression',
+            exporter,
+        )
+        self.assertLess(
+            exporter.index("observed_sha256 <- sha256_file(path)"),
+            exporter.index(
+                "if (is.na(observed_size) || "
+                "observed_size != specification$size_bytes)"
+            ),
+        )
+        self.assertLess(
+            exporter.index("verify_file(package_tarball"),
+            exporter.index("utils::untar(package_tarball"),
+        )
+        self.assertLess(
+            exporter.index('verify_file(staged_paths[["clinical"]]'),
+            exporter.index("publish_verified_exports(staged_paths"),
+        )
+
+        contract_path = (
+            ROOT / "resources" / "IMvigor210_expression_semantic_contract_v1.json"
+        )
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        self.assertEqual(contract["semantic_contract_version"], 1)
+        self.assertEqual(contract["semantic_digests"]["required_scale"], 6)
+        self.assertEqual(contract["semantic_digests"]["diagnostic_scales"], [7, 8])
+        self.assertTrue(contract["analysis_canonicalization"]["required"])
+        self.assertEqual(contract["analysis_canonicalization"]["scale"], 6)
+        self.assertEqual(
+            contract["analysis_canonicalization"]["rounding"], "ROUND_HALF_UP"
+        )
+        self.assertFalse(
+            contract["privacy"]["contract_contains_identifiers_or_expression_cells"]
+        )
+        preparer = (
+            ROOT / "scripts" / "prepare_open_cohort_analysis_tables.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("semantically_verified_imvigor_expression", preparer)
+        self.assertIn("verifier.verify_expression", preparer)
+        self.assertIn("canonical_imvigor_fixed6", preparer)
+        self.assertIn('"expression_semantic_scale": IMVIGOR_EXPRESSION_SCALE', preparer)
+        imvigor_function = preparer.split("def prepare_imvigor(", 1)[1].split(
+            "\ndef workbook_header", 1
+        )[0]
+        self.assertNotIn(
+            'verified_input(raw_dir, manifest, "imvigor210_expression_export")',
+            imvigor_function,
+        )
+        self.assertIn(
+            "[canonical_imvigor_fixed6(value) for value in row[1:]]",
+            imvigor_function,
+        )
+        self.assertNotIn("[as_float(value) for value in row[1:]]", imvigor_function)
+
+        data_readme = (ROOT / "data" / "README.md").read_text(encoding="utf-8")
+        input_inventory = (
+            ROOT / "docs" / "REPRODUCIBILITY_INPUTS.md"
+        ).read_text(encoding="utf-8")
+        root_readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        data_license = (ROOT / "DATA_LICENSE.md").read_text(encoding="utf-8")
+        self.assertNotIn("should be deposited", data_readme)
+        for documentation in (
+            data_readme, input_inventory, root_readme, data_license
+        ):
+            self.assertIn("scripts/export_imvigor210_inputs.R", documentation)
+            self.assertIn("Zenodo", documentation)
+            self.assertIn("local-only", documentation)
+        for documentation in (data_readme, input_inventory, root_readme):
+            self.assertIn("--source imvigor210_processed_package", documentation)
+            self.assertIn("--accept-licensed-public-downloads", documentation)
+        validation_workflow = (
+            ROOT / ".github" / "workflows" / "validate.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'list.files("scripts", pattern = "[.]R$", full.names = TRUE)',
+            validation_workflow,
+        )
+
     def test_author_confirmed_experimental_aliases(self) -> None:
         path = (
             ROOT / "data" / "experimental" / "experimental_sample_aliases.tsv"
@@ -105,9 +250,11 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("depmap_s1b_statistics.csv", render_script)
         self.assertNotIn("DEPMAP_EXPRESSION_RELEASE", render_script)
         self.assertNotIn("DEPMAP_MODEL_RELEASE", render_script)
-        self.assertIn('release_pair_status <- "unverified"', render_script)
+        self.assertIn('release_pair_status <- "confirmed"', render_script)
         self.assertIn('expression_release <- "DepMap Public 25Q2"', render_script)
-        self.assertIn('model_release_identity_status <- "unverified"', render_script)
+        self.assertIn('model_release <- "DepMap Public 25Q2"', render_script)
+        self.assertIn('model_release_identity_status <- "confirmed"', render_script)
+        self.assertIn('same_release_pair <- "TRUE"', render_script)
         self.assertIn('"tissue_origin_filter_applied"', render_script)
         self.assertIn("library(data.table)", render_script)
         self.assertIn("library(ggplot2)", render_script)
@@ -129,10 +276,11 @@ class RepositoryContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("mtime=0", prep_script)
-        self.assertIn('"release_pair_status": "unverified"', prep_script)
+        self.assertIn('"release_pair_status": "confirmed"', prep_script)
         self.assertIn('"expression_release": "DepMap Public 25Q2"', prep_script)
-        self.assertIn('"model_release_identity_status": "unverified"', prep_script)
-        self.assertIn('"same_release_pair": None', prep_script)
+        self.assertIn('"model_release": "DepMap Public 25Q2"', prep_script)
+        self.assertIn('"model_release_identity_status": "confirmed"', prep_script)
+        self.assertIn('"same_release_pair": True', prep_script)
         self.assertIn("EXPECTED_EXPRESSION_ROWS = 1_739", prep_script)
         self.assertIn("EXPECTED_DEFAULT_ROWS = 1_684", prep_script)
         self.assertIn("EXPECTED_NONDEFAULT_ROWS = 55", prep_script)
@@ -210,10 +358,10 @@ class RepositoryContractTests(unittest.TestCase):
             hashlib.sha256(qc_path.read_bytes()).hexdigest(),
             "8d58a7113ca08c7ffd8297e26f3a3a29693e61e119186365c1fb04531d988b79",
         )
-        self.assertEqual(provenance_path.stat().st_size, 1895)
+        self.assertEqual(provenance_path.stat().st_size, 1984)
         self.assertEqual(
             hashlib.sha256(provenance_path.read_bytes()).hexdigest(),
-            "e21b63f90835e80e71c388b13e167b214773cd6a988aa43a3aaac8cd65745242",
+            "95f8c8f11fbb43b1bf093811d110bdd1c5b5d53ef7771c797c165b1061e14816",
         )
         qc = json.loads(qc_path.read_text(encoding="utf-8"))
         provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
@@ -221,12 +369,13 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertEqual(qc["derived_file"]["sha256"], hashlib.sha256(
             derived_path.read_bytes()
         ).hexdigest())
-        self.assertEqual(provenance["release_pair_status"], "unverified")
+        self.assertEqual(provenance["release_pair_status"], "confirmed")
         self.assertEqual(provenance["expression_release"], "DepMap Public 25Q2")
+        self.assertEqual(provenance["model_release"], "DepMap Public 25Q2")
         self.assertEqual(
-            provenance["model_release_identity_status"], "unverified"
+            provenance["model_release_identity_status"], "confirmed"
         )
-        self.assertIsNone(provenance["same_release_pair"])
+        self.assertIs(provenance["same_release_pair"], True)
         self.assertFalse(provenance["tissue_origin_filter_applied"])
 
         summary_path = ROOT / "reference_results" / "depmap_s1b_statistics.csv"
@@ -257,7 +406,8 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("Both below threshold | 749 | 47.1%", documentation)
         self.assertIn("denominator must not", documentation)
         self.assertIn('be called "human"', documentation)
-        self.assertIn("Do not silently label both files", documentation)
+        self.assertIn("confirmed same-release", documentation)
+        self.assertIn("release-specific Figshare DOI", documentation)
 
         manifest_path = ROOT / "data" / "source_manifest.tsv"
         with manifest_path.open("r", encoding="utf-8", newline="") as handle:
@@ -270,7 +420,7 @@ class RepositoryContractTests(unittest.TestCase):
         model = manifest["depmap_model_metadata_supplied"]
         self.assertEqual(archive["cohort_id"], "DEPMAP_PUBLIC_25Q2")
         self.assertEqual(member["cohort_id"], "DEPMAP_PUBLIC_25Q2")
-        self.assertEqual(model["cohort_id"], "DEPMAP_SOURCE_PAIR")
+        self.assertEqual(model["cohort_id"], "DEPMAP_PUBLIC_25Q2")
         self.assertEqual(archive["size_bytes"], "249426032")
         self.assertEqual(
             archive["sha256"],
@@ -287,6 +437,9 @@ class RepositoryContractTests(unittest.TestCase):
             "9dbb9de8805696c1345816ab07edd23fb4fd95e117739f3c5c3b1cf062c1233b",
         )
         self.assertIn("MD5 af4472ab734ea3aec974d992b504c7e5", model["notes"])
+        self.assertIn("downloaded from the DepMap Portal All Data page", model["notes"])
+        self.assertIn("DepMap Public 25Q2", model["citation"])
+        self.assertIn("releasename=DepMap%20Public%2025Q2", model["source_url"])
 
     def test_depmap_s1b_ci_checks_publication_outputs(self) -> None:
         workflow = (
@@ -301,7 +454,9 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("verify_depmap_s1b_outputs.py", workflow)
         self.assertIn("depmap-supplementary-figure-s1b", workflow)
         self.assertIn("(4260, 3840)", verifier)
-        self.assertIn('"release_pair_status": "unverified"', verifier)
+        self.assertIn('"release_pair_status": "confirmed"', verifier)
+        self.assertIn('"model_release": "DepMap Public 25Q2"', verifier)
+        self.assertIn('"same_release_pair": "TRUE"', verifier)
         self.assertIn('"n_models": "1591"', verifier)
         self.assertIn("verify_image_pair", verifier)
 
@@ -333,6 +488,57 @@ class RepositoryContractTests(unittest.TestCase):
         )
         self.assertNotIn("is.na(.data$padj) | .data$padj < 0.05", helper_text)
         self.assertIn('cox.zph(split_fit, transform = "rank")', helper_text)
+
+    def test_r05_reviewed_signature_concordance_contract_is_exact(self) -> None:
+        contract_path = (
+            ROOT / "resources" / "CAR_T_state_signature_concordance_v1.csv"
+        )
+        self.assertEqual(
+            hashlib.sha256(contract_path.read_bytes()).hexdigest(),
+            "cb41afce9dc85a74a8c027ef764001e0179c144e1debee4cf047f1f49321badc",
+        )
+        rows = read_csv(contract_path)
+        self.assertEqual([row["cluster"] for row in rows], [f"C{i}" for i in range(10)])
+        self.assertEqual(
+            {
+                (
+                    row["contract_version"], row["r_version"],
+                    row["seurat_version"], row["matrix_version"],
+                )
+                for row in rows
+            },
+            {("1", "4.4.3", "5.5.1", "1.7.2")},
+        )
+        expected = {
+            "C0": (20, "", ""),
+            "C1": (18, "FOXP3;TSPAN32", "CD7;DUSP1"),
+            "C2": (17, "CD70;ICOS;IL2RA", "DUSP2;F5;STAT5A"),
+            "C3": (19, "C10ORF54", "IL9R"),
+            "C4": (20, "", ""),
+            "C5": (19, "GZMB", "FASLG"),
+            "C6": (19, "CD4", "HLA-DQA1"),
+            "C7": (18, "ARL4C;IL18RAP", "LIF;TRAT1"),
+            "C8": (20, "", ""),
+            "C9": (20, "", ""),
+        }
+        observed = {
+            row["cluster"]: (
+                int(row["n_overlap"]), row["frozen_only"], row["current_only"]
+            )
+            for row in rows
+        }
+        self.assertEqual(observed, expected)
+        for row in rows:
+            self.assertEqual(int(row["n_frozen"]), 20)
+            self.assertEqual(int(row["n_current"]), 20)
+            self.assertEqual(
+                len([gene for gene in row["frozen_only"].split(";") if gene]),
+                20 - int(row["n_overlap"]),
+            )
+            self.assertEqual(
+                len([gene for gene in row["current_only"].split(";") if gene]),
+                20 - int(row["n_overlap"]),
+            )
 
     def test_checkmate_source_qc(self) -> None:
         path = ROOT / "reference_results" / "source_qc.json"
@@ -453,6 +659,137 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertGreater(last_guard, -1)
         self.assertGreater(promotion, last_guard)
         self.assertGreater(promotion, source.rfind("saveRDS(obj"))
+        self.assertIn(
+            'DIAGNOSTIC_DIR <- file.path("results", "targeted-singlecell-diagnostics")',
+            source,
+        )
+        self.assertIn("Supplementary_Table_S5_signature_membership_differences.tsv", source)
+        self.assertIn("CAR_T_state_signature_concordance_v1.csv", source)
+        self.assertIn("reviewed_contract_match", source)
+        self.assertIn("Supplementary_Table_S5_reviewed_concordance_contract.tsv", source)
+        self.assertIn("Supplementary_Table_S5_C10_markers.tsv", source)
+        self.assertIn("Supplementary_Table_S5_cell_counts_all_QC_including_C10.csv", source)
+        self.assertIn("Supplementary_Table_S5_cell_counts_by_cluster.csv", source)
+        self.assertIn("Supplementary_Table_S5_cell_filtering_QC.tsv", source)
+        diagnostic_export = source.index(
+            "# Keep the aggregate C10 and QC evidence in a stable diagnostic directory"
+        )
+        reviewed_guard = source.index(
+            "if (any(is.na(signature_concordance$reviewed_contract_match))"
+        )
+        self.assertLess(diagnostic_export, reviewed_guard)
+        self.assertLess(
+            source.index("Supplementary_Table_S5_signature_membership_differences.tsv"),
+            source.index(
+                "Current C0-C9 top-20 marker differences do not match the exact"
+            ),
+        )
+        self.assertIn('"C10" = "C10 small cytokine/IFN-responsive cluster"', source)
+        self.assertIn("p_clusters_clean <- DimPlot(\n  obj,", source)
+        self.assertNotIn("DimPlot(\n  obj_signature_reference,", source)
+        self.assertIn("# Descriptive Figure 4B summaries retain all QC-passing C0-C10 cells.", source)
+        self.assertIn("md <- md_all", source)
+        self.assertNotIn('dplyr::filter(cluster_short != "C10")', source)
+        self.assertIn('y = "% of C0-C10 QC-passing cells"', source)
+        self.assertIn("FindAllMarkers(\n  obj_signature_reference,", source)
+        self.assertIn("expected_marker_clusters <- as.character(0:9)", source)
+        self.assertIn('"C3" = "CD8/TRDC-associated cytotoxic state"', source)
+        self.assertIn('"C4" = "Cycling T-cell state II"', source)
+        self.assertIn('title = "Cluster composition"', source)
+        self.assertNotIn("Cycling/effector T-cell state II", source)
+        self.assertNotIn("openxlsx", source)
+        self.assertEqual(source.count("writexl::write_xlsx("), 1)
+        self.assertEqual(source.count("write_marker_workbook(\n"), 2)
+
+        workflow = (
+            ROOT / ".github" / "workflows" / "imvigor-singlecell.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("id: targeted_run", workflow)
+        self.assertIn("steps.targeted_run.outcome", workflow)
+        self.assertIn("results/targeted-singlecell-diagnostics", workflow)
+        self.assertIn("any::writexl@2.0.0", workflow)
+        self.assertIn('writexl = "2.0.0"', workflow)
+        self.assertNotIn("any::openxlsx", workflow)
+        self.assertEqual(workflow.count("python scripts/verify_xlsx_workbook.py"), 2)
+        self.assertIn("openpyxl==3.1.5", workflow)
+        self.assertEqual(workflow.count("--require-openpyxl"), 2)
+        targeted_job = workflow.split("  targeted-singlecell:\n", 1)[1]
+        self.assertIn("uses: actions/setup-python@v6", targeted_job)
+        self.assertIn('python-version: "3.12.13"', targeted_job)
+        self.assertEqual(
+            workflow.count('"resources/CAR_T_state_signature_concordance_v1.csv"'),
+            2,
+        )
+        self.assertGreaterEqual(workflow.count("if: always()"), 2)
+        self.assertGreaterEqual(
+            workflow.count("R_LIBS=/runner-temp/imvigor210-r-library"), 3
+        )
+        self.assertIn("lib = library_path", workflow)
+        self.assertIn("find.package(package, lib.loc = library_path)", workflow)
+        install_step = workflow.split(
+            "      - name: Install and assert the legacy top-level packages\n", 1
+        )[1].split(
+            "      - name: Recreate and scientifically verify both exports\n", 1
+        )[0]
+        self.assertIn("docker run --rm -i \\", install_step)
+        self.assertIn("for package in DESeq Biobase edgeR; do", install_step)
+        self.assertIn('package_dir="$IMVIGOR_R_LIBRARY/$package"', install_step)
+        self.assertIn('test -d "$package_dir"', install_step)
+        self.assertGreater(
+            install_step.index("for package in DESeq Biobase edgeR; do"),
+            install_step.index("\n          RSCRIPT\n"),
+        )
+        for relative_path in (
+            '"$package_dir/DESCRIPTION"',
+            '"$package_dir/NAMESPACE"',
+            '"$package_dir/Meta/package.rds"',
+        ):
+            self.assertIn(f"test -s {relative_path}", install_step)
+        self.assertIn("-name '00LOCK*'", install_step)
+        self.assertIn(
+            "bioconductor/bioconductor_docker:RELEASE_3_11@sha256:"
+            "cbd868b0543608c917cef2003cc8f051ba15e6633bf941f35802825b1e5551ab",
+            workflow,
+        )
+        self.assertIn("id: imvigor_export", workflow)
+        self.assertIn("steps.imvigor_export.outcome", workflow)
+        self.assertIn(
+            "--diagnostics-path "
+            "/runner-temp/imvigor210-verification/export_diagnostics.tsv",
+            workflow,
+        )
+        self.assertIn(
+            "python scripts/verify_imvigor210_expression.py \\\n",
+            workflow,
+        )
+        self.assertIn("--external-semantic-file-verification", workflow)
+        self.assertIn(
+            "expression_semantic_verification.json", workflow
+        )
+        self.assertEqual(
+            workflow.count("Validate the non-identifying semantic framing"), 1
+        )
+        self.assertIn(
+            "path: ${{ runner.temp }}/imvigor210-verification/",
+            workflow,
+        )
+        imvigor_upload = workflow.split(
+            "      - name: Upload IMvigor210 verification report only\n", 1
+        )[1].split("\n\n  targeted-singlecell:", 1)[0]
+        self.assertIn("if: always()", imvigor_upload)
+        self.assertNotIn("IMVIGOR_EXPORT_DIR", imvigor_upload)
+        self.assertNotIn("imvigor210-exports", imvigor_upload)
+
+    def test_imvigor_exporter_preserves_named_transaction_paths(self) -> None:
+        source = (ROOT / "scripts" / "export_imvigor210_inputs.R").read_text(
+            encoding="utf-8"
+        )
+        normalized = " ".join(source.split())
+        self.assertIn(
+            'temporary_paths <- stats::setNames( paste0(unname(final_paths), ".tmp"), names(final_paths) )',
+            normalized,
+        )
+        self.assertIn("temporary_paths[[name]]", source)
 
     def test_figure_5f_displays_the_adjusted_gene_family(self) -> None:
         source = (ROOT / "R" / "09_figure_5F_S6G.R").read_text(encoding="utf-8")
