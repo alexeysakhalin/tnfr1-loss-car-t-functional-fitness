@@ -85,6 +85,12 @@ cluster_cols <- c(
   C8 = "#A27AE8", C9 = "#D865D8"
 )
 
+format_p <- function(x) {
+  if (is.na(x)) return("NA")
+  if (x < 0.001) return("< 0.001")
+  sprintf("%.3f", x)
+}
+
 save_km <- function(endpoint, cluster, filename) {
   key <- paste(endpoint, cluster, sep = "_")
   fit <- fits[[key]]
@@ -102,19 +108,35 @@ save_km <- function(endpoint, cluster, filename) {
       call. = FALSE
     )
   }
+  endpoint_label <- if (endpoint == "OS") {
+    "Overall survival"
+  } else {
+    "Progression-free survival"
+  }
   subtitle <- sprintf(
-    paste0("Nivolumab only; trial-stratified Cox HR %.2f (95%% CI %.2f-%.2f), ",
-           "p=%.3g, BH p=%.3g; descriptive log-rank p=%.3g, BH p=%.3g"),
-    r$HR_high_vs_low, r$CI_low, r$CI_high,
-    r$cox_p, r$cox_BH_10_states, r$logrank_p, r$logrank_BH_10_states
+    paste0(
+      "Nivolumab only (n = %d)\n",
+      "Trial-stratified Cox (median split): HR %.2f (95%% CI %.2f-%.2f)\n",
+      "Cox p = %s; BH p = %s\n",
+      "Median-split log-rank (descriptive): p = %s; BH p = %s"
+    ),
+    nrow(fit$data), r$HR_high_vs_low, r$CI_low, r$CI_high,
+    format_p(r$cox_p), format_p(r$cox_BH_10_states),
+    format_p(r$logrank_p), format_p(r$logrank_BH_10_states)
   )
   p <- survminer::ggsurvplot(
     fit$km_fit, data = fit$data, risk.table = TRUE, censor = TRUE,
     palette = c("grey65", unname(cluster_cols[[cluster]])),
     legend.title = paste(cluster, "score"), legend.labs = c("Low", "High"),
-    title = paste(endpoint, "by", cluster, "transferred T-cell-state expression signature"),
+    title = paste(endpoint_label, "by", cluster, "transferred T-cell-state signature"),
     subtitle = subtitle, xlab = "Time (months)", ylab = "Survival probability"
   )
+  p$plot <- p$plot +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(size = 17, face = "bold", hjust = 0),
+      plot.subtitle = ggplot2::element_text(size = 11.5, lineheight = 1.12, hjust = 0),
+      plot.margin = ggplot2::margin(t = 12, r = 20, b = 8, l = 12)
+    )
   save_ggsurvplot_pair(p, file.path(out_dir, filename))
 }
 

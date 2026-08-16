@@ -44,8 +44,12 @@ write.csv(fit$result,
 
 r <- fit$result[1, ]
 subtitle <- sprintf(
-  "Nivolumab only; trial-stratified Cox HR %.2f (95%% CI %.2f-%.2f), p=%.3f; descriptive log-rank p=%.3f",
-  r$HR_high_vs_low, r$CI_low, r$CI_high, r$cox_p, r$logrank_p
+  paste0(
+    "Nivolumab only (n = %d)\n",
+    "Trial-stratified Cox: HR %.2f (95%% CI %.2f-%.2f); p = %.3f\n",
+    "Median-split log-rank (descriptive): p = %.3f"
+  ),
+  r$n, r$HR_high_vs_low, r$CI_low, r$CI_high, r$cox_p, r$logrank_p
 )
 p <- survminer::ggsurvplot(
   fit$km_fit, data = fit$data, risk.table = TRUE, censor = TRUE,
@@ -56,7 +60,9 @@ p <- survminer::ggsurvplot(
 )
 save_ggsurvplot_pair(
   p,
-  file.path(out_dir, "Figure_5D_KM_ccRCC_Tcell_score.png")
+  file.path(out_dir, "Figure_5D_KM_ccRCC_Tcell_score.png"),
+  width = 8.2,
+  height = 7.2
 )
 
 qc <- tibble(

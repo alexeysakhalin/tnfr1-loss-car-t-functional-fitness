@@ -121,15 +121,16 @@ make_wt_volcano_plot <- function(condition, panel_title, compact = FALSE) {
       plot.title = ggplot2::element_text(
         hjust = 0.5,
         size = if (compact) 9 else ggplot2::rel(1.2),
-        face = if (compact) "bold" else "plain"
+        face = "plain",
+        margin = ggplot2::margin(b = if (compact) 3 else 8, unit = "pt")
       ),
       axis.text = ggplot2::element_text(size = if (compact) 8 else ggplot2::rel(0.8)),
       axis.title = ggplot2::element_text(size = if (compact) 8.5 else ggplot2::rel(1)),
       legend.position = if (compact) "none" else "right",
       plot.margin = if (compact) {
-        grid::unit(c(4, 3, 2, 2), "pt")
+        grid::unit(c(8, 3, 2, 2), "pt")
       } else {
-        ggplot2::margin()
+        ggplot2::margin(t = 14, r = 6, b = 6, l = 6, unit = "pt")
       }
     ) +
     ggrepel::geom_label_repel(

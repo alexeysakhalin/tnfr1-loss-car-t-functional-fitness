@@ -149,24 +149,30 @@ pairs <- tribble(
   "TNF/IFNG score", "NF-kB score"
 )
 
-cor_results <- crossing(
-  cohort_id = cohort_order,
-  comparison = pairs$comparison
-) |>
-  left_join(pairs, by = "comparison") |>
-  mutate(result = map2(.data$cohort_id, .data$comparison, function(cohort, comparison) {
-    spec <- pairs |> filter(.data$comparison == .env$comparison)
-    dat <- score_df |> filter(.data$cohort_id == cohort)
+cor_results <- map_dfr(cohort_order, function(cohort) {
+  dat <- score_df[score_df$cohort_id == cohort, , drop = FALSE]
+  map_dfr(seq_len(nrow(pairs)), function(i) {
+    spec <- pairs[i, , drop = FALSE]
+    x_column <- spec[["x"]][[1]]
+    y_column <- spec[["y"]][[1]]
     test <- suppressWarnings(cor.test(
-      dat[[spec$x[[1]]]], dat[[spec$y[[1]]]],
+      dat[[x_column]], dat[[y_column]],
       method = "spearman", exact = FALSE
     ))
     tibble(
-      n = nrow(dat), rho = unname(test$estimate), p = test$p.value,
+      cohort_id = cohort,
+      comparison = spec[["comparison"]][[1]],
+      x = x_column,
+      y = y_column,
+      x_label = spec[["x_label"]][[1]],
+      y_label = spec[["y_label"]][[1]],
+      n = nrow(dat),
+      rho = unname(test$estimate),
+      p = test$p.value,
       cohort_label = unname(cohort_labels[[cohort]])
     )
-  })) |>
-  unnest(.data$result) |>
+  })
+}) |>
   mutate(BH_p_12_tests = p.adjust(.data$p, method = "BH")) |>
   arrange(match(.data$comparison, pairs$comparison), match(.data$cohort_id, cohort_order))
 
@@ -186,8 +192,8 @@ p_bars <- ggplot(cor_results, aes(.data$cohort_label, .data$rho,
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_text(aes(label = sprintf("n=%d\nBH p=%.3g", .data$n,
                                 .data$BH_p_12_tests),
-                y = if_else(.data$rho >= 0, .data$rho + 0.08, .data$rho - 0.08)),
-            size = 3) +
+                y = if_else(.data$rho >= 0, .data$rho + 0.06, .data$rho - 0.06)),
+            vjust = ifelse(cor_results$rho >= 0, 0, 1), size = 3) +
   facet_wrap(~ comparison, nrow = 1) +
   scale_fill_manual(values = cohort_colors) +
   coord_cartesian(ylim = c(-1.25, 1.25), clip = "off") +
@@ -205,19 +211,19 @@ save_ggplot_pair(
   width = 13, height = 5.2
 )
 
-ccrcc_long <- pairs |>
-  mutate(data = pmap(list(.data$comparison, .data$x, .data$y,
-                          .data$x_label, .data$y_label),
-                     function(comparison, x, y, x_label, y_label) {
-    score_df |>
-      filter(.data$cohort_id == "CHECKMATE_CCRCC") |>
-      transmute(
-        comparison = .env$comparison, x_value = .data[[x]], y_value = .data[[y]],
-        x_label = .env$x_label, y_label = .env$y_label
-      )
-  })) |>
-  select(.data$data) |>
-  unnest(.data$data) |>
+ccrcc_source <- score_df[
+  score_df$cohort_id == "CHECKMATE_CCRCC", , drop = FALSE
+]
+ccrcc_long <- map_dfr(seq_len(nrow(pairs)), function(i) {
+  spec <- pairs[i, , drop = FALSE]
+  tibble(
+    comparison = spec[["comparison"]][[1]],
+    x_value = ccrcc_source[[spec[["x"]][[1]]]],
+    y_value = ccrcc_source[[spec[["y"]][[1]]]],
+    x_label = spec[["x_label"]][[1]],
+    y_label = spec[["y_label"]][[1]]
+  )
+}) |>
   mutate(comparison = factor(.data$comparison, levels = pairs$comparison))
 
 ccrcc_labels <- cor_results |>
@@ -246,10 +252,11 @@ p_scatter <- ggplot(ccrcc_long, aes(.data$x_value, .data$y_value)) +
       "Exploratory Spearman analyses; LOESS curves are descriptive; ",
       "panels use n=181 complete-score tumors"
     ),
-    x = "First score (within-cohort standardized)",
-    y = "Second score (within-cohort standardized)"
+    x = "First score (standardized)",
+    y = "Second score (standardized)"
   ) +
-  theme_pub()
+  theme_pub() +
+  theme(plot.margin = margin(t = 14, r = 12, b = 12, l = 34))
 
 save_ggplot_pair(
   p_scatter,

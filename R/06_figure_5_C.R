@@ -123,7 +123,7 @@ plot_object <- ggplot(
   aes(.data$cohort_label, .data$Tcell_rank_score, fill = .data$cohort_label)
 ) +
   geom_violin(
-    alpha = 0.6, width = 0.55, trim = FALSE,
+    alpha = 0.6, width = 0.55, trim = TRUE,
     scale = "width", color = NA
   ) +
   geom_boxplot(width = 0.12, fill = "white", color = "black", linewidth = 1.1) +
