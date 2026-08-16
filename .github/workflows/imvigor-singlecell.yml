@@ -183,7 +183,9 @@ jobs:
           mkdir -p results/targeted-singlecell-artifact
           Rscript - <<'RSCRIPT'
           expected <- c(
-            Matrix = "1.7-2",
+            # packageVersion() normalizes the CRAN archive version 1.7-2 to
+            # the canonical R version string 1.7.2.
+            Matrix = "1.7.2",
             SeuratObject = "5.4.0",
             Seurat = "5.5.1",
             dplyr = "1.2.1",
