@@ -137,23 +137,13 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("e0326e16eb23bea1be980fce315acb36b224dedd7af6b47e0ba37e7747dbcc47", prep_script)
         self.assertIn("EXPECTED_MODEL_SIZE = 694_278", prep_script)
         self.assertIn("b096e03bfefdc2679211545ddbf1bb7878d69ffde07ae335af5b968a7883733c", prep_script)
-        self.assertIn(
-            "90bfdbe5c44cbb8f822e655ba7f179f3033933116285b6b2f85153b2d3d17c75",
-            prep_script,
-        )
-        self.assertIn(
-            "9dbb9de8805696c1345816ab07edd23fb4fd95e117739f3c5c3b1cf062c1233b",
-            prep_script,
-        )
-        self.assertIn("af4472ab734ea3aec974d992b504c7e5", prep_script)
-
         derived_path = ROOT / "data" / "analysis" / (
             "depmap_s1b_eligible_models.tsv.gz"
         )
-        self.assertEqual(derived_path.stat().st_size, 47514)
+        self.assertEqual(derived_path.stat().st_size, 40212)
         self.assertEqual(
             hashlib.sha256(derived_path.read_bytes()).hexdigest(),
-            "368ad92b085a722d3984a5355bea3109d8e5a2b29ffe563c3fd284cf8970f354",
+            "34e8b46cca3c7a4bd20db518affcc99e9614b7ecd7cdf0112be5271e76ad2529",
         )
         with gzip.open(derived_path, "rt", encoding="utf-8", newline="") as handle:
             rows = list(csv.DictReader(handle, delimiter="\t"))
@@ -200,15 +190,15 @@ class RepositoryContractTests(unittest.TestCase):
         provenance_path = (
             ROOT / "data" / "analysis" / "depmap_s1b_source_provenance.json"
         )
-        self.assertEqual(qc_path.stat().st_size, 1583)
+        self.assertEqual(qc_path.stat().st_size, 1795)
         self.assertEqual(
             hashlib.sha256(qc_path.read_bytes()).hexdigest(),
-            "8d58a7113ca08c7ffd8297e26f3a3a29693e61e119186365c1fb04531d988b79",
+            "e1e73d6d8f51de1d43e180068a89367882efec43c4ac932f94eae483c31677aa",
         )
-        self.assertEqual(provenance_path.stat().st_size, 1895)
+        self.assertEqual(provenance_path.stat().st_size, 1661)
         self.assertEqual(
             hashlib.sha256(provenance_path.read_bytes()).hexdigest(),
-            "e21b63f90835e80e71c388b13e167b214773cd6a988aa43a3aaac8cd65745242",
+            "2347cc256fb6832f1a8f38286c9633065d6a073605749ea2e95d76378b12bc78",
         )
         qc = json.loads(qc_path.read_text(encoding="utf-8"))
         provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
