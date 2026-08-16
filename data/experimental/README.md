@@ -12,7 +12,9 @@ underflow. Deposit the unchanged source workbooks under the manifest's stable
 canonical names; SHA-256, rather than a transient upload suffix, defines their
 identity.
 
-To rebuild these tables from the source workbooks:
+To rebuild these tables from the source workbooks, pass either a flat directory
+or the root of the deposited archive containing `bulk_rnaseq/` and
+`targeted_single_cell/` subdirectories:
 
 ```bash
 python scripts/prepare_experimental_analysis_tables.py --input-dir /path/to/workbooks

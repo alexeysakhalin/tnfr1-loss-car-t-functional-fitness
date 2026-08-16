@@ -13,7 +13,7 @@ ICAM1/conjugate experiment is Supplementary Figure S3.
 | Figure 2B | `scripts/run_bulk_rnaseq_pydeseq2.py`; `R/04_figure_2_B_suppl_S2D.R` | complete within-treatment TNFR1-KO1-versus-WT adapters | `figures/figure_2/Figure_2B_triptych.{png,tiff}` |
 | Supplementary Figure S2D | same workflow | combined four-stratum adapter; Venn uses TNF, IFN-gamma and TNF+IFN-gamma | `figures/figure_2/Supplementary_Figure_S2D_downregulated_overlap.{png,tiff}` |
 | Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R` | `WT_targeted_counts.tsv.gz`, `KO1_targeted_counts.tsv.gz`, `KO2_targeted_counts.tsv.gz` | `figures/Figure_4A_UMAP_clusters_annotated.png`; `figures/Figure_4B_cluster_fraction_facet.png` |
-| Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | same WT/KO matrices | `figures/Supplementary_Figure_S5A_UMAP_by_sample.png` |
+| Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | same WT/KO matrices | `figures/Figure_4A_UMAP_4panel.{png,tiff}` |
 | Figure 5A | `R/05_figure_4_AB_suppl_S5A.R` | `TCR_targeted_counts.tsv.gz`, 5,662 CD3-positive cells | `figures/Figure_5A_TCR_UMAP_clusters.png`; `figures/Figure_5A_TCR_cluster_composition.png` |
 
 The bulk panels use complete regenerated result universes. Figure 1B/1C DEG
@@ -52,9 +52,10 @@ from these outputs; pooled-arm panels are not compatible with this analysis.
 | Supplementary Figure S1B | repository workflow | `R/11_supplementary_1B.R` renders the tracked 1,591-model derivative; exact contracts are in `docs/DEPMAP_S1B.md` |
 | Supplementary Figure S3 | separate flow-cytometry workflow | raw FCS files, compensation/gating workspace, live-cell denominator, E:T ratio, timing, replicate/donor map and prespecified WT-versus-KO contrasts |
 
-The DepMap expression source is DepMap Public 25Q2. The exact quarterly release
-of the supplied `Model.csv` is not assigned because it could not be verified;
-the checksum-pinned metadata identity is recorded in the provenance file.
+The DepMap expression archive and `Model.csv` are a confirmed same-release
+DepMap Public 25Q2 pair downloaded from the portal's **All Data** page. The
+checksum-pinned identities and release assertion are recorded in the
+provenance file; no release-specific Figshare DOI is assigned to 25Q2.
 
 ## Final assembly checks
 

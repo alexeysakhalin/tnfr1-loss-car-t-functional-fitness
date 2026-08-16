@@ -1,0 +1,314 @@
+name: Rebuild IMvigor210 exports and targeted single-cell figures
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/imvigor-singlecell.yml"
+      - "data/source_manifest.tsv"
+      - "scripts/fetch_public_sources.py"
+      - "scripts/export_imvigor210_inputs.R"
+      - "R/05_figure_4_AB_suppl_S5A.R"
+      - "data/experimental/experimental_data_manifest.tsv"
+      - "data/experimental/singlecell/**"
+      - "resources/CAR_T_state_signatures.csv"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/imvigor-singlecell.yml"
+      - "data/source_manifest.tsv"
+      - "scripts/fetch_public_sources.py"
+      - "scripts/export_imvigor210_inputs.R"
+      - "R/05_figure_4_AB_suppl_S5A.R"
+      - "data/experimental/experimental_data_manifest.tsv"
+      - "data/experimental/singlecell/**"
+      - "resources/CAR_T_state_signatures.csv"
+
+permissions:
+  contents: read
+
+jobs:
+  imvigor210-exports:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      IMVIGOR_IMAGE: bioconductor/bioconductor_docker:RELEASE_3_11
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12.13"
+
+      - name: Define runner-local working directories
+        run: |
+          {
+            echo "IMVIGOR_PACKAGE_DIR=$RUNNER_TEMP/imvigor210-package"
+            echo "IMVIGOR_EXPORT_DIR=$RUNNER_TEMP/imvigor210-exports"
+            echo "IMVIGOR_R_LIBRARY=$RUNNER_TEMP/imvigor210-r-library"
+          } >> "$GITHUB_ENV"
+
+      - name: Create clean local-only directories
+        run: |
+          test ! -e "$IMVIGOR_PACKAGE_DIR"
+          test ! -e "$IMVIGOR_EXPORT_DIR"
+          test ! -e "$IMVIGOR_R_LIBRARY"
+          mkdir -p \
+            "$IMVIGOR_PACKAGE_DIR" \
+            "$IMVIGOR_EXPORT_DIR" \
+            "$IMVIGOR_R_LIBRARY"
+          test -z "$(find "$IMVIGOR_EXPORT_DIR" -mindepth 1 -print -quit)"
+
+      - name: Fetch and verify the official processed package
+        run: |
+          python scripts/fetch_public_sources.py \
+            --source imvigor210_processed_package \
+            --accept-licensed-public-downloads \
+            --destination "$IMVIGOR_PACKAGE_DIR"
+          python scripts/fetch_public_sources.py \
+            --source imvigor210_processed_package \
+            --accept-licensed-public-downloads \
+            --verify-only \
+            --destination "$IMVIGOR_PACKAGE_DIR"
+
+      - name: Pull the frozen legacy Bioconductor environment
+        run: docker pull "$IMVIGOR_IMAGE"
+
+      - name: Install and assert the legacy top-level packages
+        run: |
+          docker run --rm \
+            -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            -w /workspace \
+            --entrypoint Rscript \
+            "$IMVIGOR_IMAGE" \
+            -e 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/2020-10-13")); expected <- c(DESeq = "1.39.0", Biobase = "2.48.0", edgeR = "3.30.3"); stopifnot(getRversion() >= "4.0.0", getRversion() < "4.1.0", as.character(BiocManager::version()) == "3.11"); BiocManager::install(names(expected), ask = FALSE, update = FALSE); observed <- vapply(names(expected), function(package) as.character(utils::packageVersion(package)), character(1)); print(observed); stopifnot(identical(observed, expected))'
+
+      - name: Recreate and checksum-verify both exports
+        run: |
+          docker run --rm \
+            -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            -w /workspace \
+            --entrypoint Rscript \
+            "$IMVIGOR_IMAGE" \
+            scripts/export_imvigor210_inputs.R \
+            --package-tarball /runner-temp/imvigor210-package/IMvigor210CoreBiologies_1.0.0.tar.gz \
+            --output-dir /runner-temp/imvigor210-exports
+          docker run --rm \
+            -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            -w /workspace \
+            --entrypoint Rscript \
+            "$IMVIGOR_IMAGE" \
+            scripts/export_imvigor210_inputs.R \
+            --verify-only \
+            --output-dir /runner-temp/imvigor210-exports
+
+      - name: Record non-identifying verification provenance
+        run: |
+          mkdir -p results/imvigor210-verification
+          docker image inspect "$IMVIGOR_IMAGE" \
+            --format '{{index .RepoDigests 0}}' \
+            > results/imvigor210-verification/container_image.txt
+          docker run --rm \
+            -e R_LIBS_USER=/runner-temp/imvigor210-r-library \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            -w /workspace \
+            --entrypoint Rscript \
+            "$IMVIGOR_IMAGE" \
+            -e 'packages <- c("DESeq", "Biobase", "edgeR"); stopifnot(all(vapply(packages, requireNamespace, logical(1), quietly = TRUE))); cat("Bioconductor\t", as.character(BiocManager::version()), "\n", sep = ""); for (package in packages) cat(package, "\t", as.character(utils::packageVersion(package)), "\n", sep = ""); print(sessionInfo())' \
+            > results/imvigor210-verification/sessionInfo.txt
+          (
+            cd "$IMVIGOR_PACKAGE_DIR"
+            sha256sum IMvigor210CoreBiologies_1.0.0.tar.gz
+          ) > results/imvigor210-verification/package_SHA256SUMS
+          (
+            cd "$IMVIGOR_EXPORT_DIR"
+            sha256sum IMvigor210_clinical.csv IMvigor210_expression_log2CPM.csv
+            wc -c IMvigor210_clinical.csv IMvigor210_expression_log2CPM.csv
+          ) > results/imvigor210-verification/export_checksums_and_sizes.txt
+
+      - name: Upload IMvigor210 verification report only
+        uses: actions/upload-artifact@v4
+        with:
+          name: imvigor210-export-verification
+          path: results/imvigor210-verification/
+          if-no-files-found: error
+          retention-days: 14
+
+  targeted-singlecell:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      LC_ALL: C.UTF-8
+      TZ: UTC
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      RCPP_PARALLEL_NUM_THREADS: "1"
+      RSPM: https://packagemanager.posit.co/cran/__linux__/noble/2026-08-14
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.4.3"
+          cran: ${{ env.RSPM }}
+          use-public-rspm: false
+
+      - name: Install the frozen top-level single-cell environment
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::Matrix@1.7-6
+            any::SeuratObject@5.4.0
+            any::Seurat@5.5.1
+            any::dplyr@1.2.1
+            any::tidyr@1.3.2
+            any::tibble@3.3.1
+            any::ggplot2@4.0.3
+            any::patchwork@1.3.2
+            any::data.table@1.18.4
+            any::R.utils@2.13.0
+            any::scales@1.4.0
+            any::openxlsx@4.2.8.1
+          dependencies: '"hard"'
+          cache-version: targeted-singlecell-2026-08-14-v1
+
+      - name: Assert package versions and tracked input checksums
+        run: |
+          mkdir -p results/targeted-singlecell-artifact
+          Rscript - <<'RSCRIPT'
+          expected <- c(
+            Matrix = "1.7-6",
+            SeuratObject = "5.4.0",
+            Seurat = "5.5.1",
+            dplyr = "1.2.1",
+            tidyr = "1.3.2",
+            tibble = "3.3.1",
+            ggplot2 = "4.0.3",
+            patchwork = "1.3.2",
+            data.table = "1.18.4",
+            R.utils = "2.13.0",
+            scales = "1.4.0",
+            openxlsx = "4.2.8.1"
+          )
+          observed <- vapply(
+            names(expected),
+            function(package) as.character(utils::packageVersion(package)),
+            character(1)
+          )
+          expected_repo <- sub("/+$", "", Sys.getenv("RSPM"))
+          observed_repo <- sub("/+$", "", unname(getOption("repos")[["CRAN"]]))
+          stopifnot(identical(observed_repo, expected_repo))
+          stopifnot(identical(observed, expected))
+          write.table(
+            data.frame(package = names(observed), version = unname(observed)),
+            "results/targeted-singlecell-artifact/top_level_package_versions.tsv",
+            sep = "\t", quote = FALSE, row.names = FALSE
+          )
+          inventory <- as.data.frame(
+            utils::installed.packages()[, c("Package", "Version", "LibPath", "Built")],
+            stringsAsFactors = FALSE
+          )
+          inventory <- inventory[order(inventory$Package, inventory$LibPath), ]
+          write.table(
+            inventory,
+            "results/targeted-singlecell-artifact/installed_package_inventory.tsv",
+            sep = "\t", quote = FALSE, row.names = FALSE
+          )
+          writeLines(
+            c(
+              paste("R", R.version.string, sep = "\t"),
+              paste("CRAN", observed_repo, sep = "\t")
+            ),
+            "results/targeted-singlecell-artifact/runtime_repository.txt"
+          )
+          RSCRIPT
+          python - <<'PYTHON'
+          import csv
+          import hashlib
+          from pathlib import Path
+
+          root = Path.cwd()
+          manifest_path = root / "data/experimental/experimental_data_manifest.tsv"
+          with manifest_path.open(encoding="utf-8", newline="") as handle:
+              rows = list(csv.DictReader(handle, delimiter="\t"))
+          selected = {
+              row["filename_or_path"]: row
+              for row in rows
+              if row["filename_or_path"].startswith(
+                  "data/experimental/singlecell/"
+              )
+          }
+          if len(selected) != 4:
+              raise SystemExit(f"Expected four targeted matrices; found {len(selected)}")
+          report = []
+          for relative_path, row in sorted(selected.items()):
+              path = root / relative_path
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              size = path.stat().st_size
+              if digest != row["sha256"] or size != int(row["size_bytes"]):
+                  raise SystemExit(f"Input contract failed: {relative_path}")
+              report.append(f"{digest}  {relative_path}\n")
+          (root / "results/targeted-singlecell-artifact/input_SHA256SUMS").write_text(
+              "".join(report), encoding="utf-8"
+          )
+          PYTHON
+
+      - name: Run the complete targeted single-cell workflow
+        run: Rscript R/05_figure_4_AB_suppl_S5A.R
+
+      - name: Verify and stage the publication outputs
+        run: |
+          figure_stems=(
+            Figure_4A_UMAP_4panel
+            Figure_4A_UMAP_clusters_annotated
+            Figure_4B_cluster_composition_optional
+            Figure_4B_cluster_fraction_facet
+            Figure_5A_TCR_QC_violin_optional
+            Figure_5A_TCR_UMAP_clusters
+            Figure_5A_TCR_cluster_composition
+            Supplementary_Figure_S5A_UMAP_by_sample
+          )
+          for stem in "${figure_stems[@]}"; do
+            test -s "figures/${stem}.png"
+            test -s "figures/${stem}.tiff"
+          done
+          table_outputs=(
+            Figure_5A_TCR_cell_filtering_QC.tsv
+            Supplementary_Table_S5_C10_markers.tsv
+            Supplementary_Table_S5_all_cluster_markers_including_C10.tsv.gz
+            Supplementary_Table_S5_cell_counts_all_QC_including_C10.csv
+            Supplementary_Table_S5_cell_counts_by_cluster.csv
+            Supplementary_Table_S5_cell_filtering_QC.tsv
+            Supplementary_Table_S5_signature_concordance.tsv
+            Supplementary_Table_S5_top_markers_per_cluster.xlsx
+            Supplementary_Table_TCR_cluster_cell_counts.csv
+            Supplementary_Table_TCR_top_markers_per_cluster.xlsx
+            sessionInfo_R05.txt
+          )
+          for filename in "${table_outputs[@]}"; do
+            test -s "figures/${filename}"
+          done
+          find figures -maxdepth 1 -type f \
+            ! -name 'TCR_seurat_object.rds' \
+            -exec cp --target-directory=results/targeted-singlecell-artifact {} +
+          (
+            cd results/targeted-singlecell-artifact
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 sha256sum \
+              > SHA256SUMS
+          )
+
+      - name: Upload figures, marker tables, QC and session information
+        uses: actions/upload-artifact@v4
+        with:
+          name: targeted-singlecell-r05-results
+          path: results/targeted-singlecell-artifact/
+          if-no-files-found: error
+          retention-days: 14

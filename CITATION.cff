@@ -3,6 +3,10 @@ message: "If you use this analysis repository, please cite the accompanying manu
 title: "Analysis code for tumor-cell TNFR1 loss and CAR-T functional fitness"
 type: software
 license: MIT
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.19707614"
+    description: "Associated project source-workbook archive"
 authors:
   - family-names: Petukhov
     given-names: Alexey

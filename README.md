@@ -2,8 +2,8 @@
 
 This repository contains analysis code and version-controlled data products for
 the manuscript “Tumor cell TNFR1 loss attenuates inflammatory responsiveness
-and reduces CAR-T cell functional fitness in an antigen-retaining in vitro
-co-culture model.”
+and is associated with reduced CAR-T cell functional fitness in an
+antigen-retaining in vitro co-culture model.”
 
 The analyses cover tumor-cell bulk RNA-seq, targeted single-cell mRNA profiling,
 descriptive DepMap context and exploratory analyses of four published
@@ -132,8 +132,22 @@ List the required publisher files and prepare the local analysis tables:
 
 ```bash
 python scripts/fetch_public_sources.py --list
+python scripts/fetch_public_sources.py \
+  --source imvigor210_processed_package \
+  --accept-licensed-public-downloads
+Rscript scripts/export_imvigor210_inputs.R \
+  --package-tarball data/raw/IMvigor210CoreBiologies_1.0.0.tar.gz \
+  --output-dir data/raw
 python scripts/prepare_open_cohort_analysis_tables.py --include-checkmate-aggregates
 ```
+
+The IMvigor210 exporter verifies the official version 1.0.0 package archive,
+recreates the clinical and `log2(CPM + 1)` inputs, and publishes them locally
+only when their byte sizes and SHA-256 values match `data/source_manifest.tsv`.
+Because the package stores a legacy `DESeq` `CountDataSet`, this one export step
+requires a compatible legacy R/Bioconductor environment. Use
+`--verify-only --output-dir data/raw` to check existing exports without loading
+the package.
 
 Then run the clinical-context scripts in manuscript order:
 
@@ -166,6 +180,15 @@ python validation/recalculate_checkmate_survival.py \
 Patient-level clinical and expression data remain local and are excluded by
 `.gitignore`. This preserves the source access and redistribution conditions;
 only aggregate, non-identifying validation results are version-controlled.
+The IMvigor210 package archive and its two sample-level CSV exports are not
+included in the GitHub release or the DOI-backed project-data archive.
+
+The project source workbooks used to construct the tracked experimental tables
+are deposited separately in Zenodo under the reserved version DOI
+[`10.5281/zenodo.19707614`](https://doi.org/10.5281/zenodo.19707614). The record
+contains project-generated source workbooks, not third-party clinical cohorts,
+DepMap source files or the IMvigor210 package and exports. The DOI will resolve
+publicly after the record is published.
 
 ## DepMap Supplementary Figure S1B
 
@@ -181,10 +204,11 @@ Render the panel from a clean clone with:
 Rscript R/11_supplementary_1B.R
 ```
 
-The expression matrix is identified as DepMap Public 25Q2. The exact quarterly
-release of the supplied `Model.csv` could not be verified and is disclosed as
-such in the machine-readable provenance and in
-[`docs/DEPMAP_S1B.md`](docs/DEPMAP_S1B.md).
+The expression matrix and `Model.csv` are a confirmed DepMap Public 25Q2
+source pair downloaded from the portal's **All Data** page. Exact checksums and
+the machine-readable release lock are documented in
+[`docs/DEPMAP_S1B.md`](docs/DEPMAP_S1B.md). This portal-hosted release has no
+release-specific Figshare DOI.
 
 ## Figure map and experimental scope
 

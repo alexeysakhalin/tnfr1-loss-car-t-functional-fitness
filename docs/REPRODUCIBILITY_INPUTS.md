@@ -21,8 +21,11 @@ by `data/experimental/experimental_data_manifest.tsv`,
 
 ## Project source workbooks kept outside GitHub
 
-Place these files together in one local directory only when rebuilding the
-canonical experimental tables. Filenames must match exactly.
+Extract the Zenodo source-workbook archive and pass its root directory to the
+preparation script. The script accepts either a flat directory or the deposited
+`bulk_rnaseq/` and `targeted_single_cell/` subdirectories, searches recursively,
+and requires exactly one match for every filename pattern. Filenames must match
+exactly.
 
 | Required filename | Source content | Used by |
 |---|---|---|
@@ -44,9 +47,11 @@ Rebuild canonical experimental tables with:
 ```bash
 python scripts/prepare_experimental_analysis_tables.py --input-dir /path/to/workbooks
 python scripts/prepare_bulk_rnaseq_counts.py \
-  --input /path/to/workbooks/Expression_Profile.GRCh38.gene.xlsx \
+  --input /path/to/workbooks/bulk_rnaseq/Expression_Profile.GRCh38.gene.xlsx \
   --output-dir data/experimental/bulk_rnaseq
 ```
+
+For a flat local directory, omit `bulk_rnaseq/` from the second command.
 
 ## Public-cohort inputs kept outside GitHub
 
@@ -59,13 +64,38 @@ expected sizes and SHA-256 values.
 | `41591_2020_839_MOESM2_ESM.xlsx` | Braun et al. CheckMate ccRCC supplement; automatic checksum-verified download supported |
 | `41588_2023_1355_MOESM3_ESM.xlsx` | Ravi et al. SU2C-MARK supplement |
 | `41591_2019_654_MOESM4_ESM.xlsx` | Liu et al. clinical supplement |
-| `41591_2019_654_MOESM3_ESM.txt` | Liu et al. expression supplement |
-| `IMvigor210_clinical.csv` | checksum-pinned clinical export from `IMvigor210CoreBiologies` 1.0.0 |
-| `IMvigor210_expression_log2CPM.csv` | checksum-pinned log2-CPM export from the same package |
+| one of `41591_2019_654_MOESM3_ESM.txt` or `Liu2019_NatureMedicine_metastatic_melanoma_antiPD1_expression_matrix.csv` | Liu et al. expression supplement, either as the official text file or the checksum-pinned CSV export accepted by the preparer |
+| `IMvigor210CoreBiologies_1.0.0.tar.gz` | official CC BY 3.0 processed package; supplied to `scripts/export_imvigor210_inputs.R`, not to the cohort-preparation script |
+| `IMvigor210_clinical.csv` | checksum-pinned clinical export generated locally by `scripts/export_imvigor210_inputs.R` |
+| `IMvigor210_expression_log2CPM.csv` | checksum-pinned `log2(CPM + 1)` export generated locally by the same script |
 
 These files contain publisher or sample-level data and are not redistributed
 through the repository. The preparation script writes local-only harmonized
 tables under `data/analysis/` and `data/processed/`.
+
+Download the official IMvigor210 package archive from the source URL in
+`data/source_manifest.tsv`, retain its canonical filename, and run:
+
+```bash
+python scripts/fetch_public_sources.py \
+  --source imvigor210_processed_package \
+  --accept-licensed-public-downloads
+Rscript scripts/export_imvigor210_inputs.R \
+  --package-tarball data/raw/IMvigor210CoreBiologies_1.0.0.tar.gz \
+  --output-dir data/raw
+Rscript scripts/export_imvigor210_inputs.R \
+  --verify-only --output-dir data/raw
+```
+
+The downloader verifies the package archive against the manifest. The exporter
+verifies it again before reading it and publishes the two CSV files only after
+their exact sizes and SHA-256 values match the manifest. Loading the legacy
+`CountDataSet` requires a compatible R/Bioconductor environment with `DESeq`,
+`Biobase` and `edgeR`. The final command checks already generated files without
+loading the package. SHA-256 verification uses the R package `digest` or a
+`sha256sum`/`shasum` executable. The package archive and both CSV files remain
+local-only and are not included in the GitHub release or the DOI-backed
+repository archive, including Zenodo.
 
 ## DepMap source files kept outside GitHub
 
@@ -75,7 +105,7 @@ tracked compact derivative:
 | Required filename | Source identity |
 |---|---|
 | `OmicsExpressionTPMLogp1HumanProteinCodingGenes.zip` | DepMap Public 25Q2 expression archive |
-| `Model.csv` | checksum-pinned supplied DepMap model metadata; exact quarterly release unverified |
+| `Model.csv` | checksum-pinned DepMap Public 25Q2 model metadata downloaded from the same **All Data** release page as the expression archive |
 
 Run:
 

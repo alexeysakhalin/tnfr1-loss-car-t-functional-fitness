@@ -12,9 +12,11 @@ from verify_bulk_figure_outputs import verify_image_pair
 
 
 EXPECTED_PROVENANCE = {
-    "release_pair_status": "unverified",
+    "release_pair_status": "confirmed",
     "expression_release": "DepMap Public 25Q2",
-    "model_release_identity_status": "unverified",
+    "model_release": "DepMap Public 25Q2",
+    "model_release_identity_status": "confirmed",
+    "same_release_pair": "TRUE",
     "derived_file": "depmap_s1b_eligible_models.tsv.gz",
     "population": (
         "DepMap cell-line models with a non-missing OncoTree primary-disease "
@@ -84,7 +86,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     verify_outputs(args.repository_root.resolve())
     print(
         "Supplementary Figure S1B: passed; n=1,591; "
-        "PNG/TIFF 600 dpi; TIFF LZW; provenance locked as unverified pair"
+        "PNG/TIFF 600 dpi; TIFF LZW; provenance locked as a confirmed "
+        "DepMap Public 25Q2 source pair"
     )
     return 0
 

@@ -83,11 +83,17 @@ def sha256(path: Path) -> str:
 
 
 def locate_one(input_dir: Path, pattern: str) -> Path:
-    matches = sorted(input_dir.glob(pattern))
+    # Accept either a flat source directory or the documented Zenodo layout,
+    # which separates bulk RNA-seq and targeted single-cell workbooks into
+    # subdirectories.  Uniqueness is still enforced across the complete tree.
+    matches = sorted(path for path in input_dir.rglob(pattern) if path.is_file())
     if len(matches) != 1:
+        display_matches = [
+            str(path.relative_to(input_dir)) for path in matches
+        ]
         raise RuntimeError(
-            f"Expected exactly one file matching {pattern!r} in {input_dir}; "
-            f"found {len(matches)}: {[path.name for path in matches]}"
+            f"Expected exactly one file matching {pattern!r} under {input_dir}; "
+            f"found {len(matches)}: {display_matches}"
         )
     return matches[0]
 
@@ -701,7 +707,10 @@ def parse_args() -> argparse.Namespace:
         "--input-dir",
         type=Path,
         required=True,
-        help="Directory containing the eight source workbooks",
+        help=(
+            "Directory containing the eight source workbooks, either directly "
+            "or in nested bulk_rnaseq/ and targeted_single_cell/ directories"
+        ),
     )
     parser.add_argument(
         "--output-dir",

@@ -22,12 +22,12 @@
   },
   "expression_release": "DepMap Public 25Q2",
   "expression_release_identity_status": "confirmed",
-  "model_release": null,
-  "model_release_identity_status": "unverified",
+  "model_release": "DepMap Public 25Q2",
+  "model_release_identity_status": "confirmed",
   "population_rule": "is_default_entry == True; ModelType == Cell Line; non-empty OncotreePrimaryDisease != Non-Cancerous; finite RIPK3 and NLRP3",
-  "release_identity_note": "The expression matrix is DepMap Public 25Q2. Model.csv is separately checksum-pinned, but its release identity must be confirmed before a same-release claim is made.",
-  "release_pair_status": "unverified",
-  "same_release_pair": null,
+  "release_identity_note": "Both source files were downloaded by the authors from the DepMap Portal All Data page for DepMap Public 25Q2 and are pinned here by filename, size, and checksum. DepMap Public 25Q2 was portal-hosted and has no release-specific Figshare DOI.",
+  "release_pair_status": "confirmed",
+  "same_release_pair": true,
   "source_files": {
     "expression_archive": {
       "filename": "OmicsExpressionTPMLogp1HumanProteinCodingGenes.zip",

@@ -53,10 +53,13 @@ sequencing accessions are provenance records, not downloader inputs.
 Place these verified files in `data/raw/` before running the preparation step:
 
 - `41588_2023_1355_MOESM3_ESM.xlsx` (SU2C-MARK Supplementary Tables 1 and 13);
-- `41591_2019_654_MOESM4_ESM.xlsx` and
-  `41591_2019_654_MOESM3_ESM.txt` (Liu clinical table and TPM matrix);
-- `IMvigor210_clinical.csv` and `IMvigor210_expression_log2CPM.csv`, the
-  checksum-pinned project exports from `IMvigor210CoreBiologies` 1.0.0;
+- `41591_2019_654_MOESM4_ESM.xlsx` and either
+  `41591_2019_654_MOESM3_ESM.txt` or the checksum-pinned
+  `Liu2019_NatureMedicine_metastatic_melanoma_antiPD1_expression_matrix.csv`
+  (Liu clinical table and TPM matrix);
+- `IMvigor210_clinical.csv` and `IMvigor210_expression_log2CPM.csv`, recreated
+  locally from the checksum-pinned `IMvigor210CoreBiologies` 1.0.0 package as
+  described below;
 - `41591_2020_839_MOESM2_ESM.xlsx` (downloaded by the script for local
   CheckMate calculations).
 
@@ -110,13 +113,39 @@ genes.
 The public processed package is `IMvigor210CoreBiologies` 1.0.0 (CC BY 3.0).
 Raw sequencing data at EGA are controlled access and are not used by the
 downloader. The preparation script consumes two checksum-pinned project
-exports: the clinical data frame and the log2-CPM expression matrix. The exact
-historical commands that produced these CSV files from the package were not
-present in the supplied repository; reproduction therefore begins from the
-two verified exports. They should be deposited in the versioned data archive
-before publication. Entrez identifiers are mapped with the checksum-pinned
-HGNC snapshot. Any redistributed derivatives must retain attribution and state
-that they were reformatted and gene-filtered.
+exports: the clinical data frame and the log2-CPM expression matrix. Recreate
+them from the official package archive with:
+
+```bash
+python scripts/fetch_public_sources.py \
+  --source imvigor210_processed_package \
+  --accept-licensed-public-downloads
+Rscript scripts/export_imvigor210_inputs.R \
+  --package-tarball data/raw/IMvigor210CoreBiologies_1.0.0.tar.gz \
+  --output-dir data/raw
+```
+
+The exporter first verifies the 122,127,298-byte package archive against
+SHA-256 `cfdd3176d7b34de5b04fb9416bfd2b20fa4b6e238aaad5f20b048a34329ea178`.
+It loads the package `cds` object, writes `Biobase::pData(cds)` as the clinical
+table, and calculates `log2(edgeR::cpm(DESeq::counts(cds)) + 1)` on the complete
+31,286-feature count matrix. It requires a legacy R/Bioconductor environment
+that can load the package's `DESeq` `CountDataSet`, plus either the R package
+`digest` or a `sha256sum`/`shasum` executable. Both generated CSV files must
+match the byte sizes and SHA-256 values in `source_manifest.tsv`; a checksum
+mismatch stops the export. Existing local files can be checked with:
+
+```bash
+Rscript scripts/export_imvigor210_inputs.R \
+  --verify-only --output-dir data/raw
+```
+
+The official package archive and both patient/sample-level CSV exports remain
+local-only. They are excluded from Git and from the DOI-backed code/data
+archive, including Zenodo; readers obtain the licensed package from its
+recorded source and run the exporter. Entrez identifiers are subsequently
+mapped with the checksum-pinned HGNC snapshot. Any separately redistributed
+derivative must retain attribution, the CC BY 3.0 licence and a change notice.
 
 ### SU2C-MARK
 
@@ -165,9 +194,8 @@ two expression values, threshold flags and quadrant assignment.
 
 `R/11_supplementary_1B.R` reads that tracked derivative, QC, provenance and
 statistics contract, so a clean clone can render the panel without the full
-raw files. The expression matrix is fixed as DepMap Public 25Q2; the
-`Model.csv` release identity and release-pair status remain machine-locked as
-unverified. The current contract therefore does not support calling the two
-supplied files a same-release 25Q2 pair. The complete contract, fixed counts
-and wording restrictions are documented in `docs/DEPMAP_S1B.md`.
-
+raw files. The authors confirmed that both source files were downloaded from
+the DepMap Portal **All Data** page for DepMap Public 25Q2. Their checksums,
+confirmed release-pair status and `same_release_pair=true` assertion are
+machine-locked. The complete contract, fixed counts and wording restrictions
+are documented in `docs/DEPMAP_S1B.md`.
