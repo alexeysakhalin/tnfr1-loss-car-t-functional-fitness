@@ -176,6 +176,8 @@ QC counts, marker tables, workbook structure and `sessionInfo()` before it
 publishes figure artifacts. Tumor-co-culture C10 is retained descriptively in
 Figure 4A-B but remains outside the frozen C0-C9 transferred signatures.
 
+### Cluster generation and annotation
+
 Clusters were generated independently by unsupervised Louvain clustering and
 then labelled manually from positive cluster-enriched genes ranked with
 Seurat's Wilcoxon test. No reference-atlas label transfer, SingleR, Azimuth,
@@ -192,6 +194,8 @@ tumor-co-culture C0-C10 and repeated-stimulation C0-C5 cluster. The two datasets
 are clustered and annotated independently; matching numerical cluster
 identifiers do not imply a shared biological identity. See
 [`docs/TARGETED_SINGLECELL_ANNOTATION.md`](docs/TARGETED_SINGLECELL_ANNOTATION.md).
+
+### Exploratory C6 projection
 
 The exploratory repeated-stimulation projection reports CXCL13 detection and
 the frozen tumor-co-culture C6 within-cell rank-AUC score together with its
