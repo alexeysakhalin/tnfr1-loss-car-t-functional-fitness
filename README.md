@@ -4,6 +4,8 @@
 [![Bulk RNA-seq](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/bulk-rnaseq.yml/badge.svg?branch=main)](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/bulk-rnaseq.yml)
 [![Targeted single-cell and cohort validation](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/cohort-inputs-targeted-singlecell.yml/badge.svg?branch=main)](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/actions/workflows/cohort-inputs-targeted-singlecell.yml)
 
+**Current publication release:** [`v1.1.1`](https://github.com/alexeysakhalin/tnfr1-loss-car-t-functional-fitness/releases/tag/v1.1.1). Release tags identify immutable publication snapshots; `main` may contain later documentation-only commits.
+
 Reproducible analysis repository for the manuscript:
 
 > **Tumor cell TNFR1 loss attenuates inflammatory responsiveness and is
