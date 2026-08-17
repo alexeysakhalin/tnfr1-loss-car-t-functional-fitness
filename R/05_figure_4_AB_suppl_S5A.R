@@ -24,7 +24,7 @@
 # - Figure 4A-B
 # - Supplementary Figure S5A
 # - Figure 5A
-# - Exploratory C6 projection (not assigned a manuscript panel)
+# - Supplementary Figure S8 (exploratory C6 projection; no label transfer)
 #
 # Output figures are saved to:
 #
@@ -44,7 +44,7 @@
 # - marker gene identification
 #
 # C10 is retained in the QC-passing object, descriptive Figure 4A-B summaries
-# and marker/QC exports. It is a small cytokine/IFN-responsive cluster outside
+# and marker/QC exports. It is a small cytokine/IFN-response-high cluster outside
 # the historical C0-C9 frozen-signature mapping, not a contaminant or a
 # sample-level QC exclusion. The repeated-stimulation dataset is clustered and
 # annotated independently; its C0-C5 labels are not mapped onto the
@@ -54,7 +54,7 @@
 # - Figure 4A-B (UMAP and cluster composition)
 # - Supplementary Figure S5A (UMAP per sample)
 # - Figure 5A (repeated-stimulation analysis)
-# - Exploratory C6 projection (no transfer of cluster labels)
+# - Supplementary Figure S8 (exploratory C6 projection; no transfer of labels)
 #
 # A separate section performs the repeated-stimulation analysis using the
 # TCR CD3+ subset (5,662 cells); the three CD3-negative cells in the source
