@@ -42,6 +42,10 @@ not treated as biological-replicate inference.
 
 The complete record is
 [`resources/targeted_singlecell_cluster_annotations_v1.tsv`](../resources/targeted_singlecell_cluster_annotations_v1.tsv).
+Its `analysis_source_commit` field anchors the unchanged clustering, cell
+membership and count-matrix release used for annotation review; the Git tag or
+commit containing this manifest separately identifies the nomenclature and
+projection release.
 For each tumor-co-culture C0-C10 and repeated-stimulation C0-C5 cluster it
 records:
 
@@ -96,4 +100,3 @@ clustering or labels and does not identify TCR C1 or C4 as C6 cells. The public
 artifact contains only the rendered figure, six-row cluster summary, and
 20-row gene-coverage table; it excludes cell barcodes, cell-level scores,
 expression matrices, and the Seurat object.
-

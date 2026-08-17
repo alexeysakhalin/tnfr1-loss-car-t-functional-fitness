@@ -727,7 +727,19 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertNotIn("CXCL13_detected_pct", source)
         self.assertNotIn("CXCL13_avg_log_normalized_expression", source)
         self.assertIn("coord_cartesian(ylim = c(0, 1))", source)
-        self.assertIn("No replicate-level inference", source)
+        self.assertIn('"replicate-level inference was performed.', source)
+        self.assertIn("strwrap(", source)
+        self.assertIn("width = 170", source)
+        self.assertIn(
+            'x = "Independent repeated-stimulation cluster"',
+            source,
+        )
+        self.assertIn(
+            'ggtitle("Repeated CD3/CD28-stimulation UMAP by cluster")',
+            source,
+        )
+        self.assertNotIn("Independent TCR cluster", source)
+        self.assertNotIn("across TCR clusters", source)
         self.assertIn(
             "This projection does not modify the repeated-stimulation clustering",
             source,

@@ -1846,10 +1846,10 @@ p_c6_dot <- DotPlot(
     name = "Scaled average\nexpression"
   ) +
   labs(
-    title = "Frozen tumor-co-culture C6 genes across TCR clusters",
+    title = "Frozen tumor-co-culture C6 genes across repeated-stimulation clusters",
     subtitle = "Cycle-associated component | non-cycle/context component (includes CXCL13)",
     x = NULL,
-    y = "Independent TCR cluster",
+    y = "Independent repeated-stimulation cluster",
     size = "% detected"
   ) +
   RotatedAxis() +
@@ -1919,7 +1919,7 @@ p_c6_scores <- ggplot(
   labs(
     title = "C6 projection scores",
     subtitle = "Distributions are descriptive; black points denote cluster means",
-    x = "Independent TCR cluster",
+    x = "Independent repeated-stimulation cluster",
     y = "Within-cell rank-AUC score"
   ) +
   theme_bw(base_size = 11) +
@@ -1944,16 +1944,22 @@ p_c6_projection <- p_c6_feature + p_c6_scores + p_c6_dot +
       "Frozen tumor-co-culture C6 transcriptional signature projected onto ",
       "independently clustered repeated-stimulation T cells"
     ),
-    caption = paste0(
-      "Targeted 259-gene panel. Projection scores are within-cell rank-AUC ",
-      "summaries (0-1; higher values indicate greater relative expression). ",
-      "Background is the remaining targeted-panel genes, not the whole ",
-      "transcriptome. ",
-      "The full score must be interpreted alongside both component scores ",
-      "because cycling genes can dominate it. No replicate-level inference ",
-      "was performed. Marker-defined transcriptional properties do not ",
-      "establish lineage, function or state identity; no atlas, classifier ",
-      "or cluster-label transfer was used."
+    caption = paste(
+      strwrap(
+        paste0(
+          "Targeted 259-gene panel. Projection scores are within-cell rank-AUC ",
+          "summaries (0-1; higher values indicate greater relative expression). ",
+          "Background is the remaining targeted-panel genes, not the whole ",
+          "transcriptome. The full score must be interpreted alongside both ",
+          "component scores because cycling genes can dominate it. No ",
+          "replicate-level inference was performed. Marker-defined ",
+          "transcriptional properties do not establish lineage, function or ",
+          "state identity; no atlas, classifier or cluster-label transfer was ",
+          "used."
+        ),
+        width = 170
+      ),
+      collapse = "\n"
     ),
     tag_levels = "A",
     theme = theme(
@@ -2042,7 +2048,7 @@ p_umap_clusters <- DimPlot(
     fill = scales::alpha("white", 0.75),
     label.padding = unit(0.10, "lines")
   ) +
-  ggtitle("TCR UMAP by clusters") +
+  ggtitle("Repeated CD3/CD28-stimulation UMAP by cluster") +
   theme_bw(base_size = 16) +
   theme(
     plot.title   = element_text(face = "bold", size = 20),
