@@ -5,6 +5,7 @@ The test suite guards the released analysis against changes in:
 - input structure, checksums and declared licences;
 - bulk RNA-seq contrasts, thresholds and manuscript result universes;
 - targeted single-cell marker/concordance and workbook contracts;
+- dataset-specific cluster annotations and aggregate-only C6 projection outputs;
 - published-cohort and DepMap aggregate results;
 - workflow privacy rules and artifact contents.
 

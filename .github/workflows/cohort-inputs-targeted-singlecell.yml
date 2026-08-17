@@ -9,6 +9,7 @@ on:
       - "scripts/fetch_public_sources.py"
       - "scripts/export_imvigor210_inputs.R"
       - "scripts/verify_imvigor210_expression.py"
+      - "scripts/verify_tcr_c6_projection_outputs.py"
       - "scripts/prepare_open_cohort_analysis_tables.py"
       - "resources/IMvigor210_expression_semantic_contract_v1.json"
       - "resources/IMvigor210_fixed6_canonicalization_impact_v1.json"
@@ -17,6 +18,9 @@ on:
       - "data/experimental/singlecell/**"
       - "resources/CAR_T_state_signatures.csv"
       - "resources/CAR_T_state_signature_concordance_v1.csv"
+      - "resources/targeted_singlecell_cluster_annotations_v1.tsv"
+      - "tests/test_tcr_c6_projection_outputs.py"
+      - "tests/test_targeted_singlecell_annotation_manifest.py"
   push:
     branches: [main]
     paths:
@@ -25,6 +29,7 @@ on:
       - "scripts/fetch_public_sources.py"
       - "scripts/export_imvigor210_inputs.R"
       - "scripts/verify_imvigor210_expression.py"
+      - "scripts/verify_tcr_c6_projection_outputs.py"
       - "scripts/prepare_open_cohort_analysis_tables.py"
       - "resources/IMvigor210_expression_semantic_contract_v1.json"
       - "resources/IMvigor210_fixed6_canonicalization_impact_v1.json"
@@ -33,6 +38,9 @@ on:
       - "data/experimental/singlecell/**"
       - "resources/CAR_T_state_signatures.csv"
       - "resources/CAR_T_state_signature_concordance_v1.csv"
+      - "resources/targeted_singlecell_cluster_annotations_v1.tsv"
+      - "tests/test_tcr_c6_projection_outputs.py"
+      - "tests/test_targeted_singlecell_annotation_manifest.py"
 
 permissions:
   contents: read
@@ -388,10 +396,23 @@ jobs:
       - name: Stage diagnostics and verify publication outputs
         if: always()
         run: |
-          if [[ -d results/targeted-singlecell-diagnostics ]]; then
-            find results/targeted-singlecell-diagnostics -maxdepth 1 -type f \
-              -exec cp --target-directory=results/targeted-singlecell-artifact {} +
-          fi
+          diagnostic_outputs=(
+            Supplementary_Table_S5_C10_markers.tsv
+            Supplementary_Table_S5_cell_counts_all_QC_including_C10.csv
+            Supplementary_Table_S5_cell_counts_by_cluster.csv
+            Supplementary_Table_S5_cell_filtering_QC.tsv
+            Supplementary_Table_S5_signature_concordance.tsv
+            Supplementary_Table_S5_current_top20_markers.tsv
+            Supplementary_Table_S5_frozen_signatures.tsv
+            Supplementary_Table_S5_signature_membership_differences.tsv
+            Supplementary_Table_S5_reviewed_concordance_contract.tsv
+          )
+          for filename in "${diagnostic_outputs[@]}"; do
+            path="results/targeted-singlecell-diagnostics/${filename}"
+            if [[ -s "$path" ]]; then
+              cp -- "$path" results/targeted-singlecell-artifact/
+            fi
+          done
           if [[ "${{ steps.targeted_run.outcome }}" != "success" ]]; then
             (
               cd results/targeted-singlecell-artifact
@@ -410,6 +431,7 @@ jobs:
             Figure_5A_TCR_QC_violin_optional
             Figure_5A_TCR_UMAP_clusters
             Figure_5A_TCR_cluster_composition
+            Exploratory_TCR_C6_signature_projection
             Supplementary_Figure_S5A_UMAP_by_sample
           )
           for stem in "${figure_stems[@]}"; do
@@ -427,6 +449,8 @@ jobs:
             Supplementary_Table_S5_top_markers_per_cluster.xlsx
             Supplementary_Table_TCR_cluster_cell_counts.csv
             Supplementary_Table_TCR_top_markers_per_cluster.xlsx
+            Exploratory_TCR_C6_signature_projection_by_cluster.tsv
+            Exploratory_TCR_C6_signature_projection_gene_coverage.tsv
             sessionInfo_R05.txt
           )
           for filename in "${table_outputs[@]}"; do
@@ -444,9 +468,22 @@ jobs:
             --top-n 20 \
             --expected-columns 7 \
             --require-openpyxl
-          find figures -maxdepth 1 -type f \
-            ! -name 'TCR_seurat_object.rds' \
-            -exec cp --target-directory=results/targeted-singlecell-artifact {} +
+          python scripts/verify_tcr_c6_projection_outputs.py \
+            --by-cluster \
+              figures/Exploratory_TCR_C6_signature_projection_by_cluster.tsv \
+            --gene-coverage \
+              figures/Exploratory_TCR_C6_signature_projection_gene_coverage.tsv \
+            --cluster-counts \
+              figures/Supplementary_Table_TCR_cluster_cell_counts.csv \
+            --signature-resource resources/CAR_T_state_signatures.csv
+          artifact_outputs=()
+          for stem in "${figure_stems[@]}"; do
+            artifact_outputs+=("${stem}.png" "${stem}.tiff")
+          done
+          artifact_outputs+=("${table_outputs[@]}")
+          for filename in "${artifact_outputs[@]}"; do
+            cp -- "figures/${filename}" results/targeted-singlecell-artifact/
+          done
           (
             cd results/targeted-singlecell-artifact
             find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \
