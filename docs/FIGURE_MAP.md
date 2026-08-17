@@ -16,7 +16,7 @@ ICAM1/conjugate experiment is Supplementary Figure S3.
 | Figure 4A-B | `R/05_figure_4_AB_suppl_S5A.R` | `WT_targeted_counts.tsv.gz`, `KO1_targeted_counts.tsv.gz`, `KO2_targeted_counts.tsv.gz`; `resources/CAR_T_state_signature_concordance_v1.csv` | `figures/Figure_4A_UMAP_clusters_annotated.png`; `figures/Figure_4B_cluster_fraction_facet.png`; descriptive denominator is all QC-passing C0-C10 cells |
 | Supplementary Figure S5A | `R/05_figure_4_AB_suppl_S5A.R` | same WT/KO matrices | `figures/Figure_4A_UMAP_4panel.{png,tiff}` |
 | Figure 5A | `R/05_figure_4_AB_suppl_S5A.R` | `TCR_targeted_counts.tsv.gz`, 5,662 CD3-positive cells | `figures/Figure_5A_TCR_UMAP_clusters.png`; `figures/Figure_5A_TCR_cluster_composition.png` |
-| Exploratory TCR C6-signature projection (not assigned a manuscript panel number) | `R/05_figure_4_AB_suppl_S5A.R` | frozen tumor-co-culture C6 top-20 signature; independently clustered `TCR_targeted_counts.tsv.gz` | `figures/Exploratory_TCR_C6_signature_projection.{png,tiff}`; aggregate `figures/Exploratory_TCR_C6_signature_projection_by_cluster.tsv`; `figures/Exploratory_TCR_C6_signature_projection_gene_coverage.tsv` |
+| Supplementary Figure S8: exploratory tumor-co-culture C6-signature projection | `R/05_figure_4_AB_suppl_S5A.R` | frozen tumor-co-culture C6 top-20 signature; independently clustered `TCR_targeted_counts.tsv.gz` | `figures/Exploratory_TCR_C6_signature_projection.{png,tiff}`; aggregate `figures/Exploratory_TCR_C6_signature_projection_by_cluster.tsv`; `figures/Exploratory_TCR_C6_signature_projection_gene_coverage.tsv` |
 
 The bulk panels use complete regenerated result universes. Figure 1B/1C DEG
 sets require baseMean >=30, adjusted P <0.05 and the stated fold-change
@@ -33,7 +33,7 @@ the exported marker profiles because numerical cluster identifiers may permute
 between runs. The R/05 release guard requires the exact reviewed C0-C9
 current-only/frozen-only gene pattern in the versioned concordance contract;
 the guard does not use a general overlap threshold. Figure 4A-B retains C10 as
-the neutral `small cytokine/IFN-responsive cluster` in the descriptive C0-C10
+the neutral `small cytokine/IFN-response-high cluster` in the descriptive C0-C10
 denominator. C10 is outside the historical frozen/transferred C0-C9 mapping and
 is not classified as a contaminant. Aggregate C10 marker, cluster-count and
 filtering-QC tables are retained in
@@ -48,9 +48,10 @@ these labels are specific to that independently clustered dataset.
 The complete manual annotation record is versioned in
 [`resources/targeted_singlecell_cluster_annotations_v1.tsv`](../resources/targeted_singlecell_cluster_annotations_v1.tsv).
 The exploratory C6 projection does not alter these labels. Its aggregate table
-separates the complete frozen within-cell rank score into prespecified cycling and non-cycling
-components so that a high score cannot be interpreted as C6-like biology when
-it is driven only by proliferation. The projection artifact contains no
+separates the complete frozen within-cell rank score into prespecified
+cycle-associated and non-cycle/context components so that a high score cannot
+be interpreted as C6-like biology when it is driven only by proliferation. The
+projection artifact contains no
 cell-level scores, barcodes or raw expression values.
 
 ## Exploratory published-cohort panels
