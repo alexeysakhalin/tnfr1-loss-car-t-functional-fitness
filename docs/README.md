@@ -5,6 +5,7 @@
 | [`FIGURE_MAP.md`](FIGURE_MAP.md) | Manuscript panel-to-script and output map |
 | [`REPRODUCIBILITY_INPUTS.md`](REPRODUCIBILITY_INPUTS.md) | Complete tracked and local-only input inventory |
 | [`BULK_RNASEQ_ANALYSIS.md`](BULK_RNASEQ_ANALYSIS.md) | Bulk model design, contrasts and release contracts |
+| [`TARGETED_SINGLECELL_ANNOTATION.md`](TARGETED_SINGLECELL_ANNOTATION.md) | Manual cluster annotation, property-based nomenclature and exploratory C6 projection |
 | [`DEPMAP_S1B.md`](DEPMAP_S1B.md) | DepMap Public 25Q2 selection and rendering contract |
 | [`XLSX_OUTPUT_CONTRACT.md`](XLSX_OUTPUT_CONTRACT.md) | Marker-workbook integrity requirements |
 

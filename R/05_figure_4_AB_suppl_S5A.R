@@ -7,6 +7,8 @@
 # - Figure 4B: Cluster composition across WT, KO1, and KO2
 # - Supplementary Figure S5A: UMAPs split by sample
 # - Figure 5A: repeated CD3/CD28-stimulation analysis
+# - Exploratory projection of the frozen tumor-co-culture C6 signature onto
+#   the independently clustered repeated-stimulation dataset
 #
 # ------------------------------------------------------------
 # DATA REQUIREMENTS (IMPORTANT)
@@ -22,6 +24,7 @@
 # - Figure 4A-B
 # - Supplementary Figure S5A
 # - Figure 5A
+# - Supplementary Figure S8 (exploratory C6 projection; no label transfer)
 #
 # Output figures are saved to:
 #
@@ -41,7 +44,7 @@
 # - marker gene identification
 #
 # C10 is retained in the QC-passing object, descriptive Figure 4A-B summaries
-# and marker/QC exports. It is a small cytokine/IFN-responsive cluster outside
+# and marker/QC exports. It is a small cytokine/IFN-response-high cluster outside
 # the historical C0-C9 frozen-signature mapping, not a contaminant or a
 # sample-level QC exclusion. The repeated-stimulation dataset is clustered and
 # annotated independently; its C0-C5 labels are not mapped onto the
@@ -51,6 +54,7 @@
 # - Figure 4A-B (UMAP and cluster composition)
 # - Supplementary Figure S5A (UMAP per sample)
 # - Figure 5A (repeated-stimulation analysis)
+# - Supplementary Figure S8 (exploratory C6 projection; no transfer of labels)
 #
 # A separate section performs the repeated-stimulation analysis using the
 # TCR CD3+ subset (5,662 cells); the three CD3-negative cells in the source
@@ -224,17 +228,17 @@ cluster_labels_short <- c(
 )
 
 cluster_labels_full <- c(
-  "C0"  = "C0 KLRB1+ innate-like activated",
-  "C1"  = "C1 activated CD4 checkpoint-high",
-  "C2"  = "C2 CXCR5+ type 2 helper-like",
-  "C3"  = "C3 CXCR6+ cytotoxic activated",
-  "C4"  = "C4 ZNF683+ cytotoxic CD8",
-  "C5"  = "C5 γδ T",
+  "C0"  = "C0 KLRB1/LGALS3-associated activated T-cell state",
+  "C1"  = "C1 CD4/LAG3-associated activated T-cell state",
+  "C2"  = "C2 CXCR5/IL13/CCR4-associated activated T-cell state",
+  "C3"  = "C3 CXCR6-associated cytotoxic activated state",
+  "C4"  = "C4 CD8/ZNF683-associated cytotoxic state",
+  "C5"  = "C5 TRDC-high γδ-associated cytotoxic state",
   "C6"  = "C6 CXCL13-associated cycling T-cell state",
-  "C7"  = "C7 cycling effector-like",
-  "C8"  = "C8 IL9hi TH9-like",
-  "C9"  = "C9 TCF7hi stem-like/early-memory",
-  "C10" = "C10 small cytokine/IFN-responsive cluster"
+  "C7"  = "C7 cycling effector-gene-high T-cell state",
+  "C8"  = "C8 IL9-high activated T-cell state",
+  "C9"  = "C9 TCF7/IL7R-high early-memory-associated state",
+  "C10" = "C10 small cytokine/IFN-response-high cluster"
 )
 
 # -----------------------------
@@ -247,17 +251,17 @@ cols_samples <- c(
 )
 
 cluster_cols <- c(
-  "C0 KLRB1+ innate-like activated"         = "#F08A80",
-  "C1 activated CD4 checkpoint-high"        = "#D98C00",
-  "C2 CXCR5+ type 2 helper-like"            = "#B8A500",
-  "C3 CXCR6+ cytotoxic activated"           = "#6CB400",
-  "C4 ZNF683+ cytotoxic CD8"                = "#20B95A",
-  "C5 γδ T"                                 = "#16B8A8",
+  "C0 KLRB1/LGALS3-associated activated T-cell state" = "#F08A80",
+  "C1 CD4/LAG3-associated activated T-cell state" = "#D98C00",
+  "C2 CXCR5/IL13/CCR4-associated activated T-cell state" = "#B8A500",
+  "C3 CXCR6-associated cytotoxic activated state" = "#6CB400",
+  "C4 CD8/ZNF683-associated cytotoxic state" = "#20B95A",
+  "C5 TRDC-high γδ-associated cytotoxic state" = "#16B8A8",
   "C6 CXCL13-associated cycling T-cell state" = "#29AFC4",
-  "C7 cycling effector-like"                = "#2A96E6",
-  "C8 IL9hi TH9-like"                       = "#A27AE8",
-  "C9 TCF7hi stem-like/early-memory"        = "#D865D8",
-  "C10 small cytokine/IFN-responsive cluster" = "#E75AA2"
+  "C7 cycling effector-gene-high T-cell state" = "#2A96E6",
+  "C8 IL9-high activated T-cell state" = "#A27AE8",
+  "C9 TCF7/IL7R-high early-memory-associated state" = "#D865D8",
+  "C10 small cytokine/IFN-response-high cluster" = "#E75AA2"
 )
 
 # -----------------------------
@@ -1471,9 +1475,9 @@ obj <- RunUMAP(
 # Cluster labels
 # -----------------------------
 tcr_cluster_labels <- c(
-  "C0" = "Mixed activated CD4/KLRB1+ state",
+  "C0" = "Mixed CD4/KLRB1-associated activated state",
   "C1" = "Cycling T-cell state I",
-  "C2" = "Cytokine-producing effector state",
+  "C2" = "Cytokine-expressing effector state",
   "C3" = "CD8/TRDC-associated cytotoxic state",
   "C4" = "Cycling T-cell state II",
   "C5" = "CCR7/IL7R/HLA-II-associated state"
@@ -1504,6 +1508,485 @@ obj$cluster_annot <- factor(
   levels = unname(tcr_cluster_labels[paste0("C", cluster_ids)])
 )
 
+# -----------------------------
+# Exploratory projection of the frozen tumor-co-culture C6 signature
+# -----------------------------
+# This projection does not modify the repeated-stimulation clustering or its
+# independent C0-C5 annotations. It asks only whether the genes that define the
+# frozen tumor-co-culture C6 state are relatively expressed within those fixed
+# clusters. Because the TCR input contains one repeated-stimulation sample and
+# no biological-replicate field, the summaries below are descriptive and no
+# cell-level P values are calculated.
+c6_signature_path <- file.path("resources", "CAR_T_state_signatures.csv")
+c6_signature_source <- data.table::fread(
+  c6_signature_path,
+  data.table = FALSE,
+  check.names = FALSE
+)
+c6_required_columns <- c(
+  "avg_log2FC", "pct.1", "pct.2", "cluster", "gene"
+)
+if (!all(c6_required_columns %in% colnames(c6_signature_source))) {
+  stop("The frozen signature table has an unexpected schema: ", c6_signature_path)
+}
+
+c6_signature <- c6_signature_source %>%
+  dplyr::filter(as.character(.data$cluster) == "6") %>%
+  dplyr::mutate(
+    frozen_rank = dplyr::row_number(),
+    gene = toupper(trimws(as.character(.data$gene)))
+  ) %>%
+  dplyr::select(
+    .data$gene, .data$frozen_rank, .data$avg_log2FC, .data$pct.1, .data$pct.2
+  )
+
+if (nrow(c6_signature) != 20L ||
+    anyNA(c6_signature$gene) ||
+    any(!nzchar(c6_signature$gene)) ||
+    anyDuplicated(c6_signature$gene)) {
+  stop("The frozen tumor-co-culture C6 projection requires 20 unique genes.")
+}
+
+# The component split is a prespecified descriptive decomposition of the
+# frozen 20-gene C6 membership. It is not used to recluster or relabel cells.
+# The non-cycle component contains CXCL13 and all frozen C6 genes that are not
+# assigned to the canonical DNA-replication/mitotic program.
+c6_cycle_genes <- c(
+  "TK1", "MKI67", "AURKB", "TOP2A", "UBE2C", "HMGB2", "TYMS", "HMMR",
+  "PTTG2"
+)
+c6_non_cycle_associated_genes <- c(
+  "CHI3L2", "CXCL13", "FOXP1", "CD70", "IER5", "IL23R", "JUN", "CXCR4",
+  "FAS", "CCR7", "CD4"
+)
+c6_signature_genes <- c6_signature$gene
+if (length(intersect(c6_cycle_genes, c6_non_cycle_associated_genes)) != 0L ||
+    !setequal(
+      c(c6_cycle_genes, c6_non_cycle_associated_genes),
+      c6_signature_genes
+    ) ||
+    !"CXCL13" %in% c6_non_cycle_associated_genes) {
+  stop("The reviewed C6 component definition must partition the frozen signature.")
+}
+
+normalized_tcr <- LayerData(obj, assay = "RNA", layer = "data")
+counts_tcr <- LayerData(obj, assay = "RNA", layer = "counts")
+if (!identical(colnames(normalized_tcr), colnames(obj)) ||
+    !identical(colnames(counts_tcr), colnames(obj))) {
+  stop("TCR expression layers are not aligned to the annotated object.")
+}
+
+missing_c6_genes <- setdiff(c6_signature_genes, rownames(normalized_tcr))
+if (length(missing_c6_genes) != 0L) {
+  stop(
+    "The TCR targeted panel lacks frozen C6 gene(s): ",
+    paste(missing_c6_genes, collapse = ", ")
+  )
+}
+
+ranked_tcr <- apply(
+  as.matrix(normalized_tcr),
+  2,
+  function(expression) rank(-expression, ties.method = "average")
+)
+rownames(ranked_tcr) <- rownames(normalized_tcr)
+colnames(ranked_tcr) <- colnames(normalized_tcr)
+rank_universe_size <- nrow(ranked_tcr)
+expected_rank_sum <- rank_universe_size * (rank_universe_size + 1) / 2
+if (rank_universe_size != 259L ||
+    any(abs(colSums(ranked_tcr) - expected_rank_sum) > 1e-8)) {
+  stop("The within-cell TCR gene-rank contract failed.")
+}
+
+# A within-cell rank-AUC score is used because a raw mean of log-normalized
+# expression can be dominated by abundant proliferation transcripts. For a
+# signature of m genes in the fixed N=259 targeted panel, this is the normalized
+# Mann-Whitney probability-of-superiority score: 1 - U/[m(N-m)]. It ranges from
+# 0 to 1 and equals 0.5 under random placement of signature genes in the
+# within-cell expression ranking. Tied values, including zero-count genes,
+# receive average ranks. The background is the complement within this targeted
+# panel, so the score is panel-relative rather than transcriptome-wide.
+rank_auc_score <- function(rank_matrix, genes) {
+  if (!length(genes) || any(!genes %in% rownames(rank_matrix))) {
+    stop("A C6 projection component has missing or undefined genes.")
+  }
+  n_signature <- length(genes)
+  n_universe <- nrow(rank_matrix)
+  denominator <- n_signature * (n_universe - n_signature)
+  u_statistic <- colSums(rank_matrix[genes, , drop = FALSE]) -
+    n_signature * (n_signature + 1) / 2
+  score <- 1 - u_statistic / denominator
+  if (length(score) != ncol(rank_matrix) ||
+      any(!is.finite(score)) ||
+      any(score < -1e-12) ||
+      any(score > 1 + 1e-12)) {
+    stop("A C6 projection score is incomplete or non-finite.")
+  }
+  pmin(1, pmax(0, as.numeric(score)))
+}
+
+obj$TCR_C6_full_rank_score <- rank_auc_score(
+  ranked_tcr, c6_signature_genes
+)
+obj$TCR_C6_cycle_rank_score <- rank_auc_score(
+  ranked_tcr, c6_cycle_genes
+)
+obj$TCR_C6_noncycle_rank_score <- rank_auc_score(
+  ranked_tcr, c6_non_cycle_associated_genes
+)
+obj$CXCL13_log_normalized <- as.numeric(
+  normalized_tcr["CXCL13", , drop = TRUE]
+)
+obj$CXCL13_detected <- as.numeric(counts_tcr["CXCL13", , drop = TRUE]) > 0
+
+if (!identical(obj$CXCL13_detected, obj$CXCL13_log_normalized > 0)) {
+  stop("CXCL13 detection is inconsistent between count and normalized layers.")
+}
+
+c6_gene_coverage <- c6_signature %>%
+  dplyr::mutate(
+    component = dplyr::case_when(
+      .data$gene %in% c6_cycle_genes ~ "cycle",
+      .data$gene %in% c6_non_cycle_associated_genes ~ "noncycle",
+      TRUE ~ NA_character_
+    ),
+    in_targeted_panel = .data$gene %in% rownames(normalized_tcr),
+    used_in_score = .data$in_targeted_panel,
+    exclusion_reason = ifelse(.data$used_in_score, "", "not_in_targeted_panel")
+  ) %>%
+  dplyr::transmute(
+    .data$gene,
+    .data$component,
+    frozen_avg_log2FC = as.numeric(.data$avg_log2FC),
+    .data$in_targeted_panel,
+    .data$used_in_score,
+    .data$exclusion_reason
+  )
+if (nrow(c6_gene_coverage) != 20L ||
+    anyNA(c6_gene_coverage$component) ||
+    !all(c6_gene_coverage$used_in_score)) {
+  stop("The C6 projection gene-coverage contract failed.")
+}
+c6_gene_coverage_path <- file.path(
+  FIG_DIR, "Exploratory_TCR_C6_signature_projection_gene_coverage.tsv"
+)
+data.table::fwrite(
+  c6_gene_coverage,
+  c6_gene_coverage_path,
+  sep = "\t"
+)
+
+c6_projection_cell_data <- obj@meta.data %>%
+  tibble::rownames_to_column("cell") %>%
+  dplyr::mutate(
+    cluster_short = factor(
+      as.character(.data$cluster_short),
+      levels = expected_tcr_clusters
+    )
+  )
+
+c6_projection_by_cluster <- c6_projection_cell_data %>%
+  dplyr::group_by(.data$cluster_short) %>%
+  dplyr::summarise(
+    cluster_annotation = as.character(dplyr::first(.data$cluster_annot)),
+    n_cells = dplyr::n(),
+    c6_full_rank_score_mean = mean(.data$TCR_C6_full_rank_score),
+    c6_full_rank_score_median = median(.data$TCR_C6_full_rank_score),
+    c6_full_rank_score_q25 = quantile(
+      .data$TCR_C6_full_rank_score, 0.25, names = FALSE, type = 7
+    ),
+    c6_full_rank_score_q75 = quantile(
+      .data$TCR_C6_full_rank_score, 0.75, names = FALSE, type = 7
+    ),
+    c6_cycle_rank_score_mean = mean(.data$TCR_C6_cycle_rank_score),
+    c6_cycle_rank_score_median = median(.data$TCR_C6_cycle_rank_score),
+    c6_cycle_rank_score_q25 = quantile(
+      .data$TCR_C6_cycle_rank_score, 0.25, names = FALSE, type = 7
+    ),
+    c6_cycle_rank_score_q75 = quantile(
+      .data$TCR_C6_cycle_rank_score, 0.75, names = FALSE, type = 7
+    ),
+    c6_noncycle_rank_score_mean = mean(.data$TCR_C6_noncycle_rank_score),
+    c6_noncycle_rank_score_median = median(.data$TCR_C6_noncycle_rank_score),
+    c6_noncycle_rank_score_q25 = quantile(
+      .data$TCR_C6_noncycle_rank_score, 0.25, names = FALSE, type = 7
+    ),
+    c6_noncycle_rank_score_q75 = quantile(
+      .data$TCR_C6_noncycle_rank_score, 0.75, names = FALSE, type = 7
+    ),
+    cxcl13_detected_cells = sum(.data$CXCL13_detected),
+    cxcl13_detection_fraction = mean(.data$CXCL13_detected),
+    cxcl13_mean_log_normalized_expression = mean(
+      .data$CXCL13_log_normalized
+    ),
+    .groups = "drop"
+  ) %>%
+  dplyr::arrange(.data$cluster_short)
+
+expected_projection_columns <- c(
+  "cluster_short", "cluster_annotation", "n_cells",
+  "c6_full_rank_score_mean", "c6_full_rank_score_median",
+  "c6_full_rank_score_q25", "c6_full_rank_score_q75",
+  "c6_cycle_rank_score_mean", "c6_cycle_rank_score_median",
+  "c6_cycle_rank_score_q25", "c6_cycle_rank_score_q75",
+  "c6_noncycle_rank_score_mean", "c6_noncycle_rank_score_median",
+  "c6_noncycle_rank_score_q25", "c6_noncycle_rank_score_q75",
+  "cxcl13_detected_cells", "cxcl13_detection_fraction",
+  "cxcl13_mean_log_normalized_expression"
+)
+if (!identical(colnames(c6_projection_by_cluster), expected_projection_columns) ||
+    !identical(
+      as.character(c6_projection_by_cluster$cluster_short),
+      expected_tcr_clusters
+    ) ||
+    !identical(
+      c6_projection_by_cluster$cluster_annotation,
+      unname(tcr_cluster_labels[expected_tcr_clusters])
+    ) ||
+    sum(c6_projection_by_cluster$n_cells) != ncol(obj) ||
+    any(c6_projection_by_cluster$cxcl13_detected_cells < 0L) ||
+    any(
+      c6_projection_by_cluster$cxcl13_detected_cells >
+        c6_projection_by_cluster$n_cells
+    ) ||
+    any(c6_projection_by_cluster$cxcl13_detection_fraction < 0) ||
+    any(c6_projection_by_cluster$cxcl13_detection_fraction > 1) ||
+    any(!is.finite(as.matrix(c6_projection_by_cluster[, 3:ncol(
+      c6_projection_by_cluster
+    )])))) {
+  stop("The per-cluster C6 projection output contract failed.")
+}
+c6_projection_by_cluster_path <- file.path(
+  FIG_DIR, "Exploratory_TCR_C6_signature_projection_by_cluster.tsv"
+)
+data.table::fwrite(
+  c6_projection_by_cluster,
+  c6_projection_by_cluster_path,
+  sep = "\t"
+)
+
+c6_projection_table_paths <- c(
+  c6_gene_coverage_path,
+  c6_projection_by_cluster_path
+)
+if (any(!file.exists(c6_projection_table_paths)) ||
+    any(file.info(c6_projection_table_paths)$size <= 0L)) {
+  stop("A C6 projection table was not written correctly.")
+}
+c6_gene_coverage_check <- data.table::fread(
+  c6_gene_coverage_path, data.table = FALSE, check.names = FALSE
+)
+c6_projection_by_cluster_check <- data.table::fread(
+  c6_projection_by_cluster_path, data.table = FALSE, check.names = FALSE
+)
+if (nrow(c6_gene_coverage_check) != 20L ||
+    !identical(colnames(c6_gene_coverage_check), colnames(c6_gene_coverage)) ||
+    nrow(c6_projection_by_cluster_check) != 6L ||
+    !identical(
+      colnames(c6_projection_by_cluster_check),
+      expected_projection_columns
+    ) ||
+    sum(c6_projection_by_cluster_check$n_cells) != ncol(obj) ||
+    sum(c6_projection_by_cluster_check$cxcl13_detected_cells) !=
+      sum(obj$CXCL13_detected)) {
+  stop("A written C6 projection table failed round-trip validation.")
+}
+
+# Panel A: direct CXCL13 visualization on the unchanged TCR UMAP.
+p_c6_feature <- FeaturePlot(
+  obj,
+  features = "CXCL13",
+  reduction = "umap",
+  order = TRUE,
+  min.cutoff = 0,
+  max.cutoff = "q99",
+  cols = c("#F2F2F2", "#B2182B"),
+  pt.size = 0.45
+) +
+  labs(
+    title = "CXCL13 expression",
+    subtitle = "Log-normalized expression; colour capped at the 99th percentile"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 10),
+    axis.title = element_text(face = "bold", size = 11),
+    axis.text = element_text(size = 9, color = "black")
+  )
+
+# Panel B: all frozen C6 genes, with cycle genes shown first. Dot size reports
+# the fraction detected and colour reports the gene-wise scaled cluster mean,
+# following Seurat::DotPlot's documented display convention.
+c6_cycle_plot_order <- c6_signature$gene[
+  c6_signature$gene %in% c6_cycle_genes
+]
+c6_non_cycle_plot_order <- c6_signature$gene[
+  c6_signature$gene %in% c6_non_cycle_associated_genes
+]
+c6_dot_features <- c(c6_cycle_plot_order, c6_non_cycle_plot_order)
+p_c6_dot <- DotPlot(
+  obj,
+  features = c6_dot_features,
+  assay = "RNA",
+  group.by = "cluster_short",
+  dot.scale = 6,
+  scale = TRUE,
+  col.min = -2.5,
+  col.max = 2.5
+) +
+  geom_vline(
+    xintercept = length(c6_cycle_plot_order) + 0.5,
+    linetype = "dashed",
+    linewidth = 0.35,
+    color = "grey35"
+  ) +
+  scale_color_gradient2(
+    low = "#2166AC", mid = "#F7F7F7", high = "#B2182B", midpoint = 0,
+    name = "Scaled average\nexpression"
+  ) +
+  labs(
+    title = "Frozen tumor-co-culture C6 genes across repeated-stimulation clusters",
+    subtitle = "Cycle-associated component | non-cycle/context component (includes CXCL13)",
+    x = NULL,
+    y = "Independent repeated-stimulation cluster",
+    size = "% detected"
+  ) +
+  RotatedAxis() +
+  theme_bw(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 10),
+    axis.title = element_text(face = "bold", size = 11),
+    axis.text = element_text(size = 9, color = "black"),
+    legend.title = element_text(size = 9),
+    legend.text = element_text(size = 8)
+  )
+
+# Panel C: descriptive per-cell rank-AUC score distributions. These values are
+# not inferential test statistics.
+c6_score_long <- c6_projection_cell_data %>%
+  dplyr::select(
+    .data$cluster_short,
+    .data$TCR_C6_full_rank_score,
+    .data$TCR_C6_cycle_rank_score,
+    .data$TCR_C6_noncycle_rank_score
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -dplyr::all_of("cluster_short"),
+    names_to = "score_component",
+    values_to = "score"
+  ) %>%
+  dplyr::mutate(
+    score_component = factor(
+      .data$score_component,
+      levels = c(
+        "TCR_C6_full_rank_score",
+        "TCR_C6_cycle_rank_score",
+        "TCR_C6_noncycle_rank_score"
+      ),
+      labels = c(
+        "Full C6 transcriptional-signature score (20 genes)",
+        "Cycle-associated component (9 genes)",
+        "Non-cycle/context component (11 genes; includes CXCL13)"
+      )
+    )
+  )
+
+p_c6_scores <- ggplot(
+  c6_score_long,
+  aes(x = cluster_short, y = score, fill = score_component)
+) +
+  geom_violin(trim = TRUE, scale = "width", linewidth = 0.25, color = "grey30") +
+  geom_boxplot(
+    width = 0.12,
+    outlier.shape = NA,
+    linewidth = 0.25,
+    fill = "white"
+  ) +
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    shape = 21,
+    size = 1.8,
+    stroke = 0.35,
+    fill = "black",
+    color = "white"
+  ) +
+  facet_wrap(~score_component, ncol = 1) +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_fill_manual(values = c("#8073AC", "#E08214", "#2D9C8C")) +
+  labs(
+    title = "C6 projection scores",
+    subtitle = "Distributions are descriptive; black points denote cluster means",
+    x = "Independent repeated-stimulation cluster",
+    y = "Within-cell rank-AUC score"
+  ) +
+  theme_bw(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 10),
+    strip.text = element_text(face = "bold", size = 9),
+    axis.title = element_text(face = "bold", size = 10),
+    axis.text = element_text(size = 8.5, color = "black"),
+    legend.position = "none"
+  )
+
+p_c6_projection <- p_c6_feature + p_c6_scores + p_c6_dot +
+  patchwork::plot_layout(
+    design = "AB\nCC",
+    widths = c(1, 1.25),
+    heights = c(1, 1.05)
+  ) +
+  patchwork::plot_annotation(
+    title = "Exploratory projection; no cluster label transfer",
+    subtitle = paste0(
+      "Frozen tumor-co-culture C6 transcriptional signature projected onto ",
+      "independently clustered repeated-stimulation T cells"
+    ),
+    caption = paste(
+      strwrap(
+        paste0(
+          "Targeted 259-gene panel. Projection scores are within-cell rank-AUC ",
+          "summaries (0-1; higher values indicate greater relative expression). ",
+          "Background is the remaining targeted-panel genes, not the whole ",
+          "transcriptome. The full score must be interpreted alongside both ",
+          "component scores because cycling genes can dominate it. No ",
+          "replicate-level inference was performed. Marker-defined ",
+          "transcriptional properties do not establish lineage, function or ",
+          "state identity; no atlas, classifier or cluster-label transfer was ",
+          "used."
+        ),
+        width = 170
+      ),
+      collapse = "\n"
+    ),
+    tag_levels = "A",
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 18),
+      plot.subtitle = element_text(size = 12),
+      plot.caption = element_text(size = 9, hjust = 0)
+    )
+  )
+
+save_plot(
+  p_c6_projection,
+  "Exploratory_TCR_C6_signature_projection.png",
+  w = 18,
+  h = 12
+)
+c6_projection_figure_paths <- file.path(
+  FIG_DIR,
+  c(
+    "Exploratory_TCR_C6_signature_projection.png",
+    "Exploratory_TCR_C6_signature_projection.tiff"
+  )
+)
+if (any(!file.exists(c6_projection_figure_paths)) ||
+    any(file.info(c6_projection_figure_paths)$size <= 0L)) {
+  stop("The composite C6 projection figure was not written correctly.")
+}
+
 cluster_colors <- setNames(
   rep(cluster_palette, length.out = length(cluster_ids)),
   paste0("C", cluster_ids)
@@ -1521,9 +2004,9 @@ cluster_colors_annot <- setNames(
 
 # short labels only for text inside the UMAP
 short_umap_labels <- c(
-  "Mixed activated\nCD4/KLRB1+",
+  "Mixed CD4/KLRB1-\nassociated activated",
   "Cycling I",
-  "Cytokine-producing\neffector",
+  "Cytokine-expressing\neffector",
   "CD8/TRDC-associated\ncytotoxic",
   "Cycling II",
   "CCR7/IL7R/\nHLA-II-associated"
@@ -1565,7 +2048,7 @@ p_umap_clusters <- DimPlot(
     fill = scales::alpha("white", 0.75),
     label.padding = unit(0.10, "lines")
   ) +
-  ggtitle("TCR UMAP by clusters") +
+  ggtitle("Repeated CD3/CD28-stimulation UMAP by cluster") +
   theme_bw(base_size = 16) +
   theme(
     plot.title   = element_text(face = "bold", size = 20),

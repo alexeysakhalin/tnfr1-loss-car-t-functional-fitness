@@ -24,7 +24,7 @@ with the repository-pinned `openpyxl 3.1.5` reader and verifies the same sheet
 sequence and extents.
 
 The descriptive Figure 4A-B panels retain all QC-passing C0-C10 cells. C10 is
-reported neutrally as a small cytokine/IFN-responsive cluster and remains
+reported neutrally as a small cytokine/IFN-response-high cluster and remains
 outside the historical C0-C9 frozen/transferred signature mapping; it is not
 classified as a contaminant. The S5 marker workbook remains C0-C9 because its
 purpose is to validate that historical mapping. The complete C0-C10 marker

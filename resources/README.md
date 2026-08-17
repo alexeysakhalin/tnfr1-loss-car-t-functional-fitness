@@ -27,6 +27,18 @@ label. Marker p-values and cluster fractions are therefore descriptive at the
 cell/computational level and do not provide biological-replicate inference or
 absolute viable-cell phenotype frequencies.
 
+`targeted_singlecell_cluster_annotations_v1.tsv` is the human-readable,
+versioned annotation record for all tumor-co-culture C0-C10 and independently
+clustered repeated-stimulation C0-C5 states. It records the earlier release
+label, the property-based submission label, QC-passing cell count, defining
+markers, marker-table source, interpretive literature and properties that were
+not measured. Annotation was manual and post hoc after unsupervised Louvain
+clustering; no reference atlas, label transfer or automated classifier was
+used. Masopust et al. (2026,
+[doi:10.1038/s41577-025-01238-2](https://doi.org/10.1038/s41577-025-01238-2))
+is the nomenclature and reporting framework, not a source of transferred
+cluster identities.
+
 R/05 retains all QC-passing C0-C10 cells in the descriptive Figure 4A-B
 denominator. C10 is reported neutrally as a small cytokine/IFN-responsive
 cluster outside the historical C0-C9 frozen/transferred mapping; it is not

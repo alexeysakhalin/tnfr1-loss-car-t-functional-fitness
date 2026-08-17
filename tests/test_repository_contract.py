@@ -684,7 +684,10 @@ class RepositoryContractTests(unittest.TestCase):
                 "Current C0-C9 top-20 marker differences do not match the exact"
             ),
         )
-        self.assertIn('"C10" = "C10 small cytokine/IFN-responsive cluster"', source)
+        self.assertIn(
+            '"C10" = "C10 small cytokine/IFN-response-high cluster"',
+            source,
+        )
         self.assertIn("p_clusters_clean <- DimPlot(\n  obj,", source)
         self.assertNotIn("DimPlot(\n  obj_signature_reference,", source)
         self.assertIn("# Descriptive Figure 4B summaries retain all QC-passing C0-C10 cells.", source)
@@ -695,8 +698,52 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("expected_marker_clusters <- as.character(0:9)", source)
         self.assertIn('"C3" = "CD8/TRDC-associated cytotoxic state"', source)
         self.assertIn('"C4" = "Cycling T-cell state II"', source)
+        self.assertIn(
+            '"C0" = "Mixed CD4/KLRB1-associated activated state"',
+            source,
+        )
+        self.assertIn(
+            '"C2" = "Cytokine-expressing effector state"',
+            source,
+        )
+        self.assertNotIn("TH9-like", source)
+        self.assertNotIn("stem-like/early-memory", source)
         self.assertIn('title = "Cluster composition"', source)
         self.assertNotIn("Cycling/effector T-cell state II", source)
+        self.assertIn("Exploratory_TCR_C6_signature_projection.png", source)
+        self.assertIn(
+            "Exploratory_TCR_C6_signature_projection_by_cluster.tsv",
+            source,
+        )
+        self.assertIn(
+            "Exploratory_TCR_C6_signature_projection_gene_coverage.tsv",
+            source,
+        )
+        self.assertIn("c6_projection_by_cluster", source)
+        self.assertIn("rank_auc_score <- function", source)
+        self.assertIn('"cluster_short", "cluster_annotation", "n_cells"', source)
+        self.assertIn('"cxcl13_detected_cells", "cxcl13_detection_fraction"', source)
+        self.assertNotIn("CXCL13_detected_n", source)
+        self.assertNotIn("CXCL13_detected_pct", source)
+        self.assertNotIn("CXCL13_avg_log_normalized_expression", source)
+        self.assertIn("coord_cartesian(ylim = c(0, 1))", source)
+        self.assertIn('"replicate-level inference was performed.', source)
+        self.assertIn("strwrap(", source)
+        self.assertIn("width = 170", source)
+        self.assertIn(
+            'x = "Independent repeated-stimulation cluster"',
+            source,
+        )
+        self.assertIn(
+            'ggtitle("Repeated CD3/CD28-stimulation UMAP by cluster")',
+            source,
+        )
+        self.assertNotIn("Independent TCR cluster", source)
+        self.assertNotIn("across TCR clusters", source)
+        self.assertIn(
+            "This projection does not modify the repeated-stimulation clustering",
+            source,
+        )
         self.assertNotIn("openxlsx", source)
         self.assertEqual(source.count("writexl::write_xlsx("), 1)
         self.assertEqual(source.count("write_marker_workbook(\n"), 2)
@@ -723,6 +770,15 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("if: always()"), 2)
         self.assertGreaterEqual(
             workflow.count("R_LIBS=/runner-temp/imvigor210-r-library"), 3
+        )
+        self.assertIn("Exploratory_TCR_C6_signature_projection", workflow)
+        self.assertIn(
+            "Exploratory_TCR_C6_signature_projection_by_cluster.tsv",
+            workflow,
+        )
+        self.assertIn(
+            "Exploratory_TCR_C6_signature_projection_gene_coverage.tsv",
+            workflow,
         )
         self.assertIn("lib = library_path", workflow)
         self.assertIn("find.package(package, lib.loc = library_path)", workflow)
