@@ -69,7 +69,7 @@ analysis are under `data/experimental/singlecell/`.
 
 Nine author-generated experimental source workbooks are assigned the reserved
 Zenodo version DOI
-[`10.5281/zenodo.19707614`](https://doi.org/10.5281/zenodo.19707614) and will be
+[`10.5281/zenodo.23165048`](https://doi.org/10.5281/zenodo.23165048) and will be
 released under CC BY 4.0. Publisher-supplied cohort files, the IMvigor210 package
 and exports, and complete DepMap source files are not redistributed. Their
 official locations, licences, expected byte sizes and checksums are recorded in

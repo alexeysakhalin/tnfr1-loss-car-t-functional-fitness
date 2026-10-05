@@ -7,7 +7,7 @@ version: "1.1.1"
 date-released: 2026-08-17
 identifiers:
   - type: doi
-    value: "10.5281/zenodo.19707614"
+    value: "10.5281/zenodo.23165048"
     description: "Associated project source-workbook archive"
 authors:
   - family-names: Petukhov
