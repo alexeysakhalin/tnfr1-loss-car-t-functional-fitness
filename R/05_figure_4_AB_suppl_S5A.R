@@ -801,7 +801,7 @@ write.csv(
 # -----------------------------
 # Exploratory cell-level marker rankings. The C0-C9-only run reproduces the
 # comparison population used to freeze the transferred signatures. A separate
-# all-cluster run retains C10-versus-rest evidence for its neutral descriptive
+# all-cluster run retains C10-versus-rest evidence for its descriptive
 # annotation. C10 remains outside the frozen mapping and is not classified as a
 # contaminant. These tests do not constitute biological-replicate inference
 # between experimental groups.

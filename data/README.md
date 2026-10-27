@@ -217,5 +217,5 @@ statistics contract, so a clean clone can render the panel without the full
 raw files. The authors confirmed that both source files were downloaded from
 the DepMap Portal **All Data** page for DepMap Public 25Q2. Their checksums,
 confirmed release-pair status and `same_release_pair=true` assertion are
-machine-locked. The complete contract, fixed counts and wording restrictions
+machine-locked. The complete contract, fixed counts and interpretive limitations
 are documented in `docs/DEPMAP_S1B.md`.

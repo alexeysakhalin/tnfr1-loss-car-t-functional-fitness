@@ -165,9 +165,8 @@ dimensions and TIFF compression.
 
 `R/05_figure_4_AB_suppl_S5A.R` reads the four tracked `CD3+ cells` matrices:
 WT (3,743 cells), KO1 (2,475), KO2 (1,831) and the repeated-stimulation dataset
-(5,662). Each matrix contains 259 targeted genes. These data must be described
-as targeted single-cell mRNA profiling rather than whole-transcriptome
-single-cell RNA-seq.
+(5,662). Each matrix contains 259 targeted genes. These are targeted
+single-cell mRNA profiles, not whole-transcriptome single-cell RNA-seq data.
 
 ```bash
 Rscript R/05_figure_4_AB_suppl_S5A.R

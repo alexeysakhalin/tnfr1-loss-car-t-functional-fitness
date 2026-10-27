@@ -71,7 +71,7 @@ base mean, fold change, p-value or adjusted p-value is applied to the exported
 tables; expected missing statistics are retained and labelled.
 
 The `--include-interaction` option fits the prespecified
-`genotype + treatment + genotype:treatment` model and export three formal
+`genotype + treatment + genotype:treatment` model and exports three formal
 difference-in-differences contrasts. The interaction results are distinct from
 the within-stratum contrasts used for the manuscript figures.
 

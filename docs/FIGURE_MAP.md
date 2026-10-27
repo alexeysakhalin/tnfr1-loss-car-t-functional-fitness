@@ -33,7 +33,7 @@ the exported marker profiles because numerical cluster identifiers may permute
 between runs. The R/05 release guard requires the exact reviewed C0-C9
 current-only/frozen-only gene pattern in the versioned concordance contract;
 the guard does not use a general overlap threshold. Figure 4A-B retains C10 as
-the neutral `small cytokine/IFN-response-high cluster` in the descriptive C0-C10
+the `small cytokine/IFN-response-high cluster` in the descriptive C0-C10
 denominator. C10 is outside the historical frozen/transferred C0-C9 mapping and
 is not classified as a contaminant. Aggregate C10 marker, cluster-count and
 filtering-QC tables are retained in
