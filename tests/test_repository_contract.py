@@ -404,8 +404,10 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("RIPK3 below threshold | 1,003 | 63.0%", documentation)
         self.assertIn("NLRP3 below threshold | 1,172 | 73.7%", documentation)
         self.assertIn("Both below threshold | 749 | 47.1%", documentation)
-        self.assertIn("denominator must not", documentation)
-        self.assertIn('be called "human"', documentation)
+        self.assertIn(
+            "No species filter was possible from the supplied metadata.",
+            " ".join(documentation.split()),
+        )
         self.assertIn("confirmed same-release", documentation)
         self.assertIn("release-specific Figshare DOI", documentation)
 
