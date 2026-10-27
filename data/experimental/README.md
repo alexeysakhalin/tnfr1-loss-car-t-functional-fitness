@@ -8,9 +8,9 @@ The manifest uses stable canonical deposition names. Timestamp suffixes added
 by file transfer are removed from those names; the byte-level source identity
 is preserved by SHA-256. The longer supplied IFN filename containing
 `no_zero_pvals` is normalized because two p-values are zero from numerical
-underflow. Deposit the unchanged source workbooks under the manifest's stable
-canonical names; SHA-256, rather than a transient upload suffix, defines their
-identity.
+underflow. The manifest's canonical deposition names identify the unchanged
+source workbooks; SHA-256, rather than a transient upload suffix, defines
+their identity.
 
 To rebuild these tables from the source workbooks, pass either a flat directory
 or the root of the deposited archive containing `bulk_rnaseq/` and
@@ -80,5 +80,5 @@ panel data, not whole-transcriptome single-cell RNA sequencing.
 
 The canonical tables in this directory are author-generated processed data
 released under CC BY 4.0 as described in the repository data licence. The
-original workbooks should be deposited with the article or in the immutable
-project data archive, rather than duplicated as opaque binary inputs in Git.
+original source workbooks are not included in Git; their filenames and
+checksums are recorded in `experimental_data_manifest.tsv`.
