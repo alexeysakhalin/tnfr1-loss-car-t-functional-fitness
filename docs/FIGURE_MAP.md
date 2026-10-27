@@ -27,9 +27,9 @@ confidence intervals and within-contrast BH-adjusted P values; it contains no
 between-treatment tests. Source label `T6` maps to manuscript clone
 `TNFR1-KO1`.
 
-For the targeted single-cell panels, archive before/after QC counts, nonempty
-marker tables and `sessionInfo()`. Manual cluster labels must be checked against
-the exported marker profiles because numerical cluster identifiers may permute
+Targeted single-cell outputs include before/after QC counts, nonempty
+marker tables and `sessionInfo()`. Exported marker profiles provide the reference
+for manual cluster labels because numerical cluster identifiers may permute
 between runs. The R/05 release guard requires the exact reviewed C0-C9
 current-only/frozen-only gene pattern in the versioned concordance contract;
 the guard does not use a general overlap threshold. Figure 4A-B retains C10 as
@@ -69,8 +69,8 @@ cell-level scores, barcodes or raw expression values.
 | Supplementary Figure S6G | `R/09_figure_5F_S6G.R` | tracked aggregate group-balance table | `results/figure5F/figures/Supplementary_Figure_S6G_C6_group_balance.png` |
 
 All CheckMate published-cohort panels use the 181 nivolumab-treated tumors.
-The Figure 5 and Supplementary Figure S6 composites must be assembled entirely
-from these outputs; pooled-arm panels are not compatible with this analysis.
+The Figure 5 and Supplementary Figure S6 composites use these outputs;
+pooled-arm panels are not compatible with this analysis.
 
 ## DepMap and flow-cytometry panels
 
@@ -84,12 +84,9 @@ DepMap Public 25Q2 pair downloaded from the portal's **All Data** page. The
 checksum-pinned identities and release assertion are recorded in the
 provenance file; no release-specific Figshare DOI is assigned to 25Q2.
 
-## Final assembly checks
+## Figure provenance and formats
 
-1. Run the scripts from a clean clone and archive `sessionInfo()`, console logs
-   and source checksums.
-2. Use the 600-dpi TIFF files or journal-approved vector exports for the final
-   article; retain PNG files for visual checking.
-3. Verify every reported number against the generated TSV/CSV result tables.
-4. Do not combine panels generated from different cohort definitions or source
-   versions in one composite.
+`sessionInfo()`, console logs and source checksums document each figure run.
+Generated TSV/CSV tables provide the numerical source for reported results.
+Composite panels use consistent cohort definitions and source versions.
+The release workflows provide 600-dpi TIFF images and PNG previews.
