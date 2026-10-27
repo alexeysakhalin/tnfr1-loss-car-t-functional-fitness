@@ -40,7 +40,7 @@ is the nomenclature and reporting framework, not a source of transferred
 cluster identities.
 
 R/05 retains all QC-passing C0-C10 cells in the descriptive Figure 4A-B
-denominator. C10 is reported neutrally as a small cytokine/IFN-responsive
+denominator. C10 is reported as a small cytokine/IFN-responsive
 cluster outside the historical C0-C9 frozen/transferred mapping; it is not
 classified as a contaminant. Aggregate C10 marker, cluster-count and
 filtering-QC tables are written to
