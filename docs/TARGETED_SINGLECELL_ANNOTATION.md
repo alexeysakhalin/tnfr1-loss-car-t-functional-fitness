@@ -66,7 +66,7 @@ The supporting marker outputs are
 
 ### Annotation summary
 
-The table below is a compact reader-facing view of the versioned manifest.
+The table below summarizes the versioned manifest.
 Marker anchors are descriptive evidence from the targeted panel, not a claim
 that every cell in the cluster expresses every listed gene.
 
@@ -99,11 +99,11 @@ that every cell in the cluster expresses every listed gene.
 
 ## CXCL13-associated tumor-co-culture C6
 
-Tumor-co-culture C6 remains the **CXCL13-associated cycling T-cell state**.
+Tumor-co-culture C6 is the **CXCL13-associated cycling T-cell state**.
 Its marker profile includes CXCL13 together with TK1, MKI67, AURKB, TOP2A,
-UBE2C, HMGB2, TYMS, HMMR, and PTTG2. The term *CXCL13-associated* is deliberate:
-not every C6 cell has detectable CXCL13, and the label does not establish a
-stable lineage or exhaustion program. Literature on CXCL13-positive
+UBE2C, HMGB2, TYMS, HMMR, and PTTG2. Not every C6 cell has detectable CXCL13,
+and the label does not establish a stable lineage or exhaustion program.
+Literature on CXCL13-positive
 tumor-reactive T-cell states provides interpretive context
 ([Liu et al., 2022](https://doi.org/10.1038/s43018-022-00433-7)); it was not
 used as an annotation classifier.

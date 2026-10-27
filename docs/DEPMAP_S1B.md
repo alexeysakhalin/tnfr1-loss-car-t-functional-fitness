@@ -5,17 +5,16 @@ DepMap files: a profile-level expression matrix and `Model.csv`. The code
 selects one default RNA-expression profile per `ModelID`, joins annotations,
 and applies the population rule defined below.
 
-## Publication status
+## Source provenance
 
-The numerical contract is complete. The authors confirmed that the expression
-archive and `Model.csv` were downloaded from the DepMap Portal **All Data**
-page for DepMap Public 25Q2. Their exact filenames, sizes and checksums are
-locked below, and the provenance therefore records a confirmed same-release
-25Q2 pair.
+The authors confirmed that the expression archive and `Model.csv` were
+downloaded from the DepMap Portal **All Data** page for DepMap Public 25Q2.
+Their exact filenames, sizes and checksums are locked below, and the
+provenance therefore records a confirmed same-release 25Q2 pair.
 
 DepMap Public 25Q2 was distributed through the DepMap portal and does not have
-a release-specific Figshare DOI. Cite the release and portal directly; do not
-invent a DOI.
+a release-specific Figshare DOI. The source citation identifies the release
+and portal directly.
 
 ## Checksum-pinned inputs
 
@@ -66,12 +65,9 @@ which:
 - `OncotreePrimaryDisease` is non-empty and is not `"Non-Cancerous"`; and
 - both RIPK3 and NLRP3 values are finite.
 
-This yields 1,591 eligible DepMap cell-line models. The denominator must not
-be called "human" because no species filter was possible from the supplied
-metadata. The most exact manuscript label is:
-
-> DepMap cell-line models with a non-missing OncoTree primary-disease label
-> other than `Non-Cancerous`.
+This yields 1,591 eligible DepMap cell-line models with a non-missing OncoTree
+primary-disease label other than `Non-Cancerous`. No species filter was
+possible from the supplied metadata.
 
 ## Fixed descriptive results
 
@@ -87,9 +83,9 @@ The prespecified threshold is `<0.5 log2(TPM+1)`.
 | Neither below threshold | 165 | 10.4% |
 
 These are frequencies in the checksum-pinned source pair, not prevalence
-estimates for cancers or patients. Use "below the prespecified threshold"
-rather than "absent" or an unqualified "low". Transcript abundance does not
-establish necroptotic or pyroptotic pathway competence.
+estimates for cancers or patients. The threshold is operational and does not
+imply absent expression. Transcript abundance does not establish necroptotic
+or pyroptotic pathway competence.
 
 ## Reproduction
 
@@ -120,34 +116,18 @@ It then rewrites the TSV, QC, source-provenance and statistics artifacts
 deterministically. Release labels are not accepted as command-line overrides
 and cannot be injected into the locked provenance by a rendering command.
 
-## Manuscript wording
+## Interpretation
 
-Methods may use the following concise template:
-
-> We selected records with `is_default_entry=True` from the checksum-pinned
-> DepMap Public 25Q2 profile-level log2(TPM+1) matrix and joined them by
-> `ModelID` to the same-release checksum-pinned `Model.csv`. We retained
-> records annotated as `ModelType="Cell Line"` with a non-missing
-> `OncotreePrimaryDisease` other than `Non-Cancerous`. `TissueOrigin` was empty
-> in the supplied metadata and was not used. RIPK3 and NLRP3 were classified as
-> below threshold at <0.5 log2(TPM+1).
-
-Results and the legend may state:
-
-> Among 1,591 eligible DepMap cell-line models, RIPK3 was below the
-> prespecified threshold in 1,003 (63.0%), NLRP3 in 1,172 (73.7%), and both in
-> 749 (47.1%). These descriptive frequencies do not establish pathway
-> competence or prevalence in human cancers.
-
-In the Discussion, use this panel only as broad descriptive context for the
-experimental tumor-cell and CAR-T phenotypes. It should not be presented as
-mechanistic or clinical validation.
+The panel provides broad descriptive context for the experimental tumor-cell
+and CAR-T phenotypes. It does not provide mechanistic or clinical validation.
 
 ## Citation
 
-Cite the release as `DepMap, Broad (2025). DepMap Public 25Q2. Dataset.
-depmap.org`, and cite the portal at <https://depmap.org/portal/>. No
-release-specific Figshare DOI is available for 25Q2. Also cite:
+DepMap, Broad (2025). *DepMap Public 25Q2*. Dataset.
+DepMap portal: <https://depmap.org/portal/>. No release-specific Figshare DOI is
+available for 25Q2.
+
+Related resource overview:
 
 Arafeh R, Shibue T, Dempster JM, et al. The present and future of the Cancer
 Dependency Map. *Nature Reviews Cancer*. 2025;25:59-73.
